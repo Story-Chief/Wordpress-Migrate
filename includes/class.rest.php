@@ -93,24 +93,25 @@ class Rest extends WP_REST_Controller
         if (!Admin::connection_check($api_key)) {
             return new WP_Error(
                 'invalid_api_key',
-                "Sorry, we couldn't connect. Please configure your API-key.",
-                array('status' => 403)
+                "Sorry, your API-key is incorrect.",
+                ['status' => 403]
             );
         }
 
         if (!Admin::destination_exists($api_key, $destination_id)) {
             return new WP_Error(
                 'invalid_api_key',
-                "Sorry, we couldn't connect. Please configure your API-key.",
-                array('status' => 403)
+                "Sorry, that channel does not exist.",
+                ['status' => 403]
             );
         }
 
         // Mapping of keys between WordPress and StoryChief
-        $authors = self::get_authors();
+        $authors = self::get_authors($api_key);
+        $post_type = get_sc_option('post_type');
         $posts_migrated = get_sc_option('posts_migrated');
-        $categories = self::get_terms('categories');
-        $tags = self::get_terms('tags');
+        $categories = self::get_terms($api_key, 'categories');
+        $tags = self::get_terms($api_key, 'tags');
 
         $the_user_query = new WP_User_Query(
             [
@@ -118,9 +119,6 @@ class Rest extends WP_REST_Controller
             ]
         );
         $administrators = $the_user_query->get_results();
-
-        // Todo: check if the token works with https://api.storychief.io/1.0/me
-        // Todo: check if destination exists
 
         if (!is_array($authors)) {
             $authors = [];
@@ -130,17 +128,11 @@ class Rest extends WP_REST_Controller
             $posts_migrated = [];
         }
 
-        $total = (new WP_Query(
-            [
-                'post_type' => $post_type,
-                'posts_per_page' => 1,
-            ]
-        ))->found_posts;
 
         $the_query = new WP_Query(
             [
                 'post_type' => $post_type,
-                'posts_per_page' => 1,
+                'posts_per_page' => 5,
                 'post__not_in' => $posts_migrated,
             ]
         );
@@ -152,21 +144,20 @@ class Rest extends WP_REST_Controller
             $post_user = get_userdata($post->post_author);
             $post_categories = [];
             $post_tags = [];
-            $post_published_at = date("Y-m-d\\TH:i:s+00:00", strtotime($post->post_date_gmt));
+            $post_published_at = date("Y-m-d\\TH:i:s+00:00", strtotime($post->post_date_gmt)); // W3C timestamp
             $post_author_id = null;
-            $post_content = get_the_content();
-            $post_content = apply_filters('the_content', $post_content);
-            $post_content = str_replace(']]>', ']]&gt;', $post_content);
+            $post_content = get_the_content(null, false, $post->ID);
+            $post_content = apply_filters('the_content', str_replace(']]>', ']]&gt;', $post_content));
 
             if (!$post_user) {
                 // Edge case:
-                // Some posts may not have an editor, this can be because the original editor got deleted
+                // Some posts may not have an author, this can be because the original user got deleted
                 $post_user = $administrators[0];
             }
 
-            $post_author_id = isset($authors[$post_user->user_email]) ? $authors[$post_user->user_email] : self::create_author(
-                $post_user
-            );
+            $post_author_id = isset($authors[$post_user->user_email]) ?
+                $authors[$post_user->user_email] :
+                self::create_author($api_key, $post_user);
 
             foreach (wp_get_post_categories($post->ID) as $category_id) {
                 /** @var WP_Term $category */
@@ -175,8 +166,8 @@ class Rest extends WP_REST_Controller
                 if (isset($categories[$category->slug])) {
                     $post_categories[] = $categories[$category->slug];
                 } else {
-                    // Create category
-                    $sc_category_id = self::create_term($category, 'categories');
+                    // Create category through the API
+                    $sc_category_id = self::create_term($api_key, $category, 'categories');
 
                     $categories[$category->slug] = $sc_category_id;
                     $post_categories[] = $sc_category_id;
@@ -190,8 +181,8 @@ class Rest extends WP_REST_Controller
                 if (isset($tags[$tag->slug])) {
                     $post_tags[] = $tags[$tag->slug];
                 } else {
-                    // Create tag
-                    $sc_tag_id = self::create_term($tag, 'tags');
+                    // Create tag through the API
+                    $sc_tag_id = self::create_term($api_key, $tag, 'tags');
 
                     $tags[$tag->slug] = $sc_tag_id;
                     $post_tags[] = $sc_tag_id;
@@ -200,11 +191,13 @@ class Rest extends WP_REST_Controller
 
             // Apply hook:
             // Developers can use this hook, to add extra parameters such as language, source_id, ...
+            // Read more: https://developers.storychief.io/
             $body = apply_filters(
                 'storychief_migrate_alter_body',
                 [
                     'title' => get_the_title(),
                     'content' => $post_content,
+                        //'<img src="https://d2wvyaiai4v4wx.cloudfront.net/account_1/Guinea-pigs-Chip-Dash-06-Hara_a894a5ac36f1519281f1510c3596f9c8.jpg">',
                     'excerpt' => get_the_excerpt(),
                     'slug' => $post->post_name,
                     'custom_fields' => [],
@@ -230,18 +223,30 @@ class Rest extends WP_REST_Controller
                     'body' => json_encode($body),
                 ]
             );
-            $sc_story = json_decode($response['body'], true)['data'];
+
+            $data = json_decode($response['body'], true);
+
+            if ($response['response']['code'] >= 400) {
+                return new WP_Error(
+                    'invalid_data',
+                    $data['message'], [
+                        'status' => 400,
+                        'errors' => $data['errors'],
+                        'post' => $body,
+                    ]
+                );
+            }
 
             $posts_migrated[] = $post->ID;
 
             update_sc_option('posts_migrated', $posts_migrated);
 
             // Set the story in SC as published
-            $response = wp_remote_post(
-                Admin::REST_URI.'/stories/'.$sc_story['id'].'/destinations',
+            wp_remote_post(
+                Admin::REST_URI.'/stories/'.$data['data']['id'].'/destinations',
                 [
                     'method' => 'PUT',
-                    'timeout' => 30,
+                    'timeout' => 10,
                     'headers' => [
                         'Content-Type' => 'application/json',
                         'Accept' => 'application/json',
@@ -258,28 +263,26 @@ class Rest extends WP_REST_Controller
                     ),
                 ]
             );
-
-            if (is_wp_error($response)) {
-                return new WP_Error($response);
-            }
-
-            $sc_destination = json_decode($response['body'], true)['data'];
         }
 
         wp_reset_postdata();
 
+        $total_posts = Admin::get_total_posts();
+        $total_completed = Admin::get_total_completed();
+        $total_percentage = Admin::get_total_percentage();
+
         return [
             'data' => [
-                'total_posts' => $total,
-                'total_completed' => count($posts_migrated),
-                'completed' => count($posts_migrated) === $total,
+                'total_posts' => $total_posts,
+                'total_completed' => $total_completed,
+                'total_percentage' => $total_percentage,
+                'completed' => $total_completed >= $total_posts,
             ],
         ];
     }
 
-    protected static function get_authors()
+    protected static function get_authors($api_key)
     {
-        $api_key = get_sc_option('migrate_api_key');
         $authors = [];
         $response = wp_remote_get(
             Admin::REST_URI.'/authors?count=200',
@@ -303,9 +306,8 @@ class Rest extends WP_REST_Controller
         return $authors;
     }
 
-    protected static function get_terms($type)
+    protected static function get_terms($api_key, $type)
     {
-        $api_key = get_sc_option('migrate_api_key');
         $data = [];
         $response = wp_remote_get(
             Admin::REST_URI.'/'.$type.'?count=500',
@@ -329,10 +331,8 @@ class Rest extends WP_REST_Controller
         return $data;
     }
 
-    protected static function create_author(WP_User $user)
+    protected static function create_author($api_key, WP_User $user)
     {
-        $api_key = get_sc_option('migrate_api_key');
-
         // 1. check if the user exists as an author
         $data = [
             'email' => $user->user_email,
@@ -367,10 +367,8 @@ class Rest extends WP_REST_Controller
         return $json['data']['id'];
     }
 
-    protected static function create_term(WP_Term $term, $type)
+    protected static function create_term($api_key, WP_Term $term, $type)
     {
-        $api_key = get_sc_option('migrate_api_key');
-
         $response = wp_remote_post(
             Admin::REST_URI.'/'.$type,
             [

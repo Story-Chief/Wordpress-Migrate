@@ -1,3 +1,5 @@
+/** @global object window.wpStoryChiefMigrate */
+
 document.addEventListener('DOMContentLoaded', () => {
     const scMigrate = document.getElementById('sc-migrate');
 
@@ -10,14 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
             'Cache': 'no-cache',
-            'X-WP-Nonce': window.wpApiSc.nonce,
+            'X-WP-Nonce': window.wpStoryChiefMigrate.nonce,
         };
         const step1 = document.getElementById('sc-step-api_key');
         const step2 = document.getElementById('sc-step-destination_id');
         const step3 = document.getElementById('sc-step-run');
         const step4 = document.getElementById('sc-step-completed');
-        const progress_label = document.getElementById('sc-progress-label');
-        const progress = document.getElementById('sc-progress');
 
         /* === REUSABLE FUNCTIONS === */
 
@@ -110,14 +110,33 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('sc-run-form').addEventListener('submit', async (event) => {
             event.preventDefault();
 
-            step3.querySelector('#sc-run-form').hidden = true;
-            step3.querySelector('#sc-run-progress').hidden = false;
+            const form = step3.querySelector('#sc-run-form');
+            const progress = step3.querySelector('#sc-run-progress');
+
+            const progress_bar = document.getElementById('sc-progress-bar');
+            const progress_label = document.getElementById('sc-progress-label');
+            const error = document.getElementById('sc-progress-error');
+
+            form.hidden = true;
+            error.hidden = true;
+            progress.hidden = false;
 
             const api_key = get_api_key();
             const destination_id = get_destination_id();
-            let completed = (window.wpApiSc.total_completed === window.wpApiSc.total_posts);
 
-            while (!completed) {
+            window.onbeforeunload = (event) => {
+                if (!window.wpStoryChiefMigrate.completed) {
+                    return window.confirm('Are you sure you want to leave?');
+                }
+
+                return false;
+            };
+
+            while (!window.wpStoryChiefMigrate.completed) {
+                progress_label.hidden = false;
+                progress_bar.hidden = false;
+                error.hidden = true;
+
                 const response = await fetch('/wp-json/storychief/migrate/run', {
                     method: 'post',
                     headers: http_headers,
@@ -130,79 +149,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const json = await response.json();
 
-                completed = json.data.completed; // Stop the script / loop if the value is true
+                window.wpStoryChiefMigrate.completed = json.data.completed;  // Stop the script / loop if the value is true
+                window.wpStoryChiefMigrate.total_posts = json.data.total_posts;
+                window.wpStoryChiefMigrate.total_completed = json.data.total_completed;
+                window.wpStoryChiefMigrate.total_percentage = json.data.total_percentage;
 
                 if (json.data.status >= 400) {
-                    // step1.hidden = true;
-                    // step2.hidden = true;
-                    // step3.hidden = true;
-                    // stepError.hidden = false;
-                    // stepError.querySelector('.update-message p').innerHTML = json.message;
-                    return false;
+                    // Show the error message
+                    error.innerHTML = `<p>${json.message}</p>`;
+                    error.hidden = false;
+
+                    if (json.data.status === 403) {
+                        // Edge case: The api_key or destination is no longer available
+                        progress_label.hidden = true;
+                        progress_bar.hidden = true;
+                        return false;
+                    } else {
+                        await new Promise((resolve) => setTimeout(resolve, 60 * 1000)); // Pause
+                        progress_label.hidden = false;
+                        progress_bar.hidden = false;
+
+                    }
                 } else {
-                    progress.setAttribute('max', json.data.total_posts);
-                    progress.setAttribute('value', json.data.total_completed);
-
-                    progress_label.innerText = Math.ceil(json.data.total_completed / json.data.total_posts * 100) + '%';
-
-                    await new Promise((resolve) => setTimeout(resolve, 3000)); // Pause
+                    error.hidden = true;
+                    progress_bar.setAttribute('max', json.data.total_posts);
+                    progress_bar.value = json.data.total_completed;
+                    progress_label.innerText = Math.ceil(json.data.total_percentage) + '%';
                 }
+
+                // Delay the next request, to throttle the amount of requests per minute
+                await new Promise((resolve) => setTimeout(resolve, 1500));
             }
 
             show_step_4();
         });
-
-        /*
-        const stepError = document.getElementById('sc-section-error');
-        const progress = document.getElementById('sc-progress');
-        const total = +window.wpApiSc.total_posts;
-        const completed = +window.wpApiSc.total_completed;
-        const loops = Math.ceil((total - completed) / 10) + 1;
-
-        let migrationRunning = false;
-
-        formMigrateRun.addEventListener('submit', async (event) => {
-            event.preventDefault();
-
-            step1.hidden = true;
-            step2.hidden = false;
-            step3.hidden = true;
-
-            for (let i = 0; i < loops; i++) {
-                const response = await fetch('/wp-json/storychief/migrate/run', {
-                    method: 'post',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'Cache': 'no-cache',
-                        'X-WP-Nonce': window.wpApiSc.nonce,
-                    },
-                    credentials: 'same-origin',
-                });
-
-                const json = await response.json();
-
-                if (json.data.status >= 400) {
-                    step1.hidden = true;
-                    step2.hidden = true;
-                    step3.hidden = true;
-                    stepError.hidden = false;
-                    stepError.querySelector('.update-message p').innerHTML = json.message;
-
-                    return false;
-                } else {
-                    progress.setAttribute('max', json.data.total);
-                    progress.setAttribute('value', json.data.completed);
-
-                    progress.innerText = (json.data.completed / json.data.total * 100) + '%';
-                }
-            }
-
-            step1.hidden = true;
-            step2.hidden = true;
-            step3.hidden = false;
-            stepError.hidden = true;
-        });
-        */
     }
 });

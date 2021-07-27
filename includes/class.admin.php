@@ -97,23 +97,40 @@ class Admin
         }
 
         $uri = plugin_dir_url(STORYCHIEF_MIGRATE_DIR.'/index.php');
-        $api_key = get_sc_option('migrate_api_key'); // Remove when committing
+        $total_posts = Admin::get_total_posts();
+        $total_completed = Admin::get_total_completed();
+        $total_percentage = Admin::get_total_percentage();
+        $completed = $total_percentage >= 100;
 
         wp_enqueue_style('storychief-migrate-css', $uri.'/css/main.css', null);
         wp_enqueue_script('storychief-migrate-js', $uri.'/js/main.js', null, null, true);
         wp_localize_script(
             'storychief-migrate-js',
-            'wpApiSc',
+            'wpStoryChiefMigrate',
             [
+                'rest_api_url' => rest_url(''),
                 'nonce' => wp_create_nonce('wp_rest'),
-                'total_posts' => Admin::get_total_posts(),
-                'total_completed' => Admin::get_total_completed(),
+                'total_posts' => $total_posts,
+                'total_completed' => $total_completed,
+                'total_percentage' => $total_percentage,
+                'completed' => $completed,
             ]
         );
 
         require STORYCHIEF_MIGRATE_DIR.'/views/general.php';
     }
 
+    public static function get_total_percentage()
+    {
+        $total_posts = Admin::get_total_posts();
+        $total_completed = Admin::get_total_completed();
+
+        if (!$total_posts) {
+            return 100;
+        }
+
+        return $total_completed <= $total_posts ? ($total_completed / $total_posts * 100) : 100;
+    }
 
     public static function get_page_url()
     {
@@ -142,6 +159,8 @@ class Admin
     }
 
     /**
+     * Validate if the API-key works
+     *
      * @param  string  $api_key
      * @return bool
      */
@@ -164,11 +183,16 @@ class Admin
             ]
         );
 
-        $json = json_decode($response['body'], true);
-
-        return isset($json['data']['id']);
+        return $response['response']['code'] < 400;
     }
 
+    /**
+     * Detect if the channel exists and is configured correctly as a WordPress website.
+     *
+     * @param $api_key
+     * @param $destination_id
+     * @return bool
+     */
     public static function destination_exists($api_key, $destination_id)
     {
         if (empty($destination_id)) {
@@ -188,16 +212,15 @@ class Admin
             ]
         );
 
-        $json = json_decode($response['body'], true);
-
-        if (
-            isset($json['data']['id'], $json['data']['status'], $json['data']['type']) &&
-            $json['data']['status'] === 'configured' &&
-            $json['data']['type'] === 'wordpress'
-        ) {
-            return true;
+        if ($response['response']['code'] >= 400) {
+            return false;
         }
 
-        return false;
+        $json = json_decode($response['body'], true);
+
+        return
+            isset($json['data']['id'], $json['data']['status'], $json['data']['type']) &&
+            $json['data']['status'] === 'configured' &&
+            $json['data']['type'] === 'wordpress';
     }
 }

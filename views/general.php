@@ -1,13 +1,23 @@
 <?php
 /** @var string $api_key */
 /** @var string $page_url */
-
-use StoryChiefMigrate\Admin;
-
+/** @var int $total_posts */
+/** @var int $total_completed */
+/** @var int $total_percentage */
+/** @var bool $completed */
 ?>
+<?php if ($completed): ?>
+    <div class="wrap">
+        <h1>StoryChief Migrate</h1>
+        <div class="sc-error update-message notice inline notice-warning notice-alt">
+            <p>
+                Sorry, there are no posts that need to migrated.
+            </p>
+        </div>
+    </div>
+<?php else: ?>
 <div class="wrap sc-migrate" id="sc-migrate">
     <h1>StoryChief Migrate</h1>
-
     <section id="sc-step-api_key">
         <ul class="sc-list">
             <li>
@@ -16,6 +26,9 @@ use StoryChiefMigrate\Admin;
             </li>
             <li>
                 You can change the post type <a href="<?= Storychief\Admin::get_page_url(); ?>">here</a>
+            </li>
+            <li>
+                This will copy all of your drafts and published posts
             </li>
             <li>
                 Please keep this tab open, while the migration is running
@@ -27,12 +40,12 @@ use StoryChiefMigrate\Admin;
                 <tbody>
                 <tr>
                     <th scope="row">
-                        <label for="api_key"><?php
-                            esc_html_e('Enter your StoryChief API Key', 'storychief-migrate'); ?></label>
+                        <label for="api_key">
+                            <?php esc_html_e('Enter your StoryChief API Key', 'storychief-migrate'); ?>
+                        </label>
                     </th>
                     <td>
-                        <textarea name="api_key" id="api_key" rows="10"><?php
-                            echo $api_key; ?></textarea>
+                        <textarea name="api_key" id="api_key" rows="10" autocomplete="off"></textarea>
                     </td>
                 </tr>
                 </tbody>
@@ -44,8 +57,7 @@ use StoryChiefMigrate\Admin;
 
             <p class="submit">
                 <button type="submit" name="submit" id="submit" class="button button-primary">
-                    <?php
-                    esc_attr_e('Next', 'storychief-migration'); ?>
+                    <?php esc_attr_e('Next', 'storychief-migration'); ?>
                 </button>
             </p>
         </form>
@@ -93,40 +105,27 @@ use StoryChiefMigrate\Admin;
             </p>
         </form>
         <div id="sc-run-progress" hidden="">
-            <?php
-            $total_posts = Admin::get_total_posts();
-            $total_completed = Admin::get_total_completed();
-            $total_percentage = $total_posts ? ceil($total_completed / $total_posts * 100) : 0;
-            ?>
             <p>
                 Please do not close this tab, while we are migrating your existing stories into StoryChief.
             </p>
-            <label for="sc-progress" id="sc-progress-label">
-                <?= $total_percentage; ?>%
+            <label for="sc-progress-label" id="sc-progress-label">
+                <?= ceil($total_percentage); ?>%
             </label>
-            <progress id="sc-progress" max="<?= Admin::get_total_posts(); ?>" value="<?= Admin::get_total_completed(); ?>"></progress>
+            <progress id="sc-progress-bar" max="<?= $total_posts; ?>" value="<?= $total_completed; ?>"></progress>
+
+            <div class="update-message notice inline notice-warning notice-alt" hidden="" id="sc-progress-error"></div>
         </div>
     </section>
     <section id="sc-step-completed" hidden>
         <p>
             We completed migrating all of your stories.
         </p>
+        <h3>Next steps</h3>
+        <ul class="sc-list">
+            <li>
+                You can disable or remove this plugin
+            </li>
+        </ul>
     </section>
-    <?php /*
-    <section id="sc-section-run" hidden>
-        <h3>Progress</h3>
-        <p>
-            Please wait and keep this window / tab open until the migration is done.
-        </p>
-        <progress id="sc-progress" max="0" value="0"></progress>
-        <section id="sc-section-step-3" hidden>
-            <p>Success, all stories were migrated to StoryChief.</p>
-        </section>
-        <section id="sc-section-error" hidden>
-            <div class="update-message notice inline notice-warning notice-alt">
-                <p>Sorry, and error</p>
-            </div>
-        </section>
-    </section>
- */ ?>
 </div>
+<?php endif; ?>
