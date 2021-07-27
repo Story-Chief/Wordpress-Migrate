@@ -1,0 +1,34 @@
+.sc-migrate progress[value] {
+    /* Reset the default appearance */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+
+    /* Get rid of default border in Firefox. */
+    border: none;
+
+    /* Dimensions */
+    width: 100%;
+    height: 20px;
+
+    /* For IE10 */
+    color: blue;
+}
+
+.sc-migrate progress[value]::-moz-progress-bar {
+    background: #2271b1;
+}
+
+.sc-migrate progress[value]::-webkit-progress-bar {
+    background: #2271b1;
+}
+
+ul.sc-list {
+    margin: 10px 0 10px 30px;
+    list-style: disc;
+}
+
+ul.sc-list > li {
+    margin: 5px 0;
+    padding: 0;
+}

@@ -1,0 +1,3 @@
+# Wordpress-Migrate
+
+# todo: explain how to use hooks to alter the seo title, description and the custom fields ...
