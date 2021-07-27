@@ -26,7 +26,6 @@ if (!defined('STORYCHIEF_MIGRATE_DIR')) {
 // TODO: remove post meta values "storychief_migrated_check"
 
 require __DIR__.'/includes/class.rest.php';
-require __DIR__.'/includes/class.filters.php';
 require __DIR__.'/includes/class.admin.php';
 
 add_action('admin_init', [\StorychiefMigrate\Admin::class, 'admin_init']);
