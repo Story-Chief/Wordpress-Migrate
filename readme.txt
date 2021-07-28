@@ -52,6 +52,7 @@ extends the what is being send back to storychief.
 
 * [Custom Fields](https://help.storychief.io/en/articles/5376131-custom-fields) in StoryChief
 * [Manage multi-language content](https://help.storychief.io/en/articles/913139-manage-multi-language-content) in StoryChief
+* [API documentation](https://developers.storychief.io/#6cb1bcf5-5132-46b5-99b3-ae72705fbd2e)
 
 ```php
 <?php
@@ -76,7 +77,29 @@ function example_storychief_migrate_alter_body (array $body, \WP_Post $post) {
 
     return $body;
 }
-add_filter('storychief_migrate_alter_body', 'example_storychief_migrate_alter_body');
+add_filter('storychief_migrate_alter_body', 'example_storychief_migrate_alter_body', null, 2);
+
+```
+==== Filter: storychief_migrate_alter_create_author ====
+
+You hook on altering the author data, send back to storychief.io
+
+* [API documentation](https://developers.storychief.io/#2c7072d9-b879-4088-b96d-7fd94ccbdb98)
+
+```php
+<?php
+
+function example_storychief_migrate_alter_body (array $author, \WP_User $user) {
+    /* === Example add Facebook, Twitter, ... links === */
+
+    $author['instagram_link'] = get_field('instagram_link', 'user_' . $user->ID);
+    $author['linkedin_link'] = get_field('linkedin_link', 'user_' . $user->ID);
+    $author['twitter_link'] = get_field('twitter_link', 'user_' . $user->ID);
+    $author['facebook_link'] = get_field('facebook_link', 'user_' . $user->ID);
+
+    return $author;
+}
+add_filter('storychief_migrate_alter_create_author', 'example_storychief_migrate_alter_create_author', null, 2);
 
 ```
 

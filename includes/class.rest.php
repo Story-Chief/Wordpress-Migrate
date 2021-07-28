@@ -141,6 +141,7 @@ class Rest extends WP_REST_Controller
             $the_query->the_post();
 
             $post = get_post(get_the_ID());
+
             $post_user = get_userdata($post->post_author);
             $post_categories = [];
             $post_tags = [];
@@ -192,21 +193,28 @@ class Rest extends WP_REST_Controller
             // Apply hook:
             // Developers can use this hook, to add extra parameters such as language, source_id, ...
             // Read more: https://developers.storychief.io/
+
+            $post_body = [
+                'title' => get_the_title(),
+                'content' => $post_content,
+                'excerpt' => get_the_excerpt(),
+                'slug' => $post->post_name,
+                'custom_fields' => [],
+                'seo_title' => get_the_title(),
+                'seo_description' => get_the_excerpt(),
+                'categories' => $post_categories,
+                'tags' => $post_tags,
+                'author_id' => $post_author_id,
+            ];
+
+            if (has_post_thumbnail()) {
+                $post_body['featured_image'] = get_the_post_thumbnail_url($post->ID, 'full');
+                $post_body['featured_image_alt'] = get_post_meta( get_post_thumbnail_id(), '_wp_attachment_image_alt', true);
+            }
+
             $body = apply_filters(
                 'storychief_migrate_alter_body',
-                [
-                    'title' => get_the_title(),
-                    'content' => $post_content,
-                        //'<img src="https://d2wvyaiai4v4wx.cloudfront.net/account_1/Guinea-pigs-Chip-Dash-06-Hara_a894a5ac36f1519281f1510c3596f9c8.jpg">',
-                    'excerpt' => get_the_excerpt(),
-                    'slug' => $post->post_name,
-                    'custom_fields' => [],
-                    'seo_title' => get_the_title(),
-                    'seo_description' => get_the_excerpt(),
-                    'categories' => $post_categories,
-                    'tags' => $post_tags,
-                    'author_id' => $post_author_id,
-                ],
+                $post_body,
                 $post
             );
 
@@ -337,12 +345,11 @@ class Rest extends WP_REST_Controller
 
     protected static function create_author($api_key, WP_User $user)
     {
-        // 1. check if the user exists as an author
-        $data = [
+        $author = [
             'email' => $user->user_email,
             'firstname' => get_user_meta($user->ID, 'first_name', true),
             'lastname' => get_user_meta($user->ID, 'last_name', true),
-            'description' => get_user_meta($user->ID, 'description', true),
+            'bio' => get_user_meta($user->ID, 'description', true),
             'profile_picture' => get_avatar_url(
                 $user->ID,
                 [
@@ -350,6 +357,9 @@ class Rest extends WP_REST_Controller
                 ]
             ),
         ];
+
+        // The hook allows to add a Twitter, Facebook link
+        $body = apply_filters('storychief_migrate_alter_create_author', $author, $user);
 
         $response = wp_remote_post(
             Admin::REST_URI.'/authors',
@@ -361,8 +371,7 @@ class Rest extends WP_REST_Controller
                     'Authorization' => 'Bearer '.$api_key,
                 ],
                 'sslverify' => false,
-                // Hook: allow to add Twitter, Facebook, ... link
-                'body' => json_encode(apply_filters('storychief_migrate_user_data', $data, $user->ID)),
+                'body' => json_encode($body),
             ]
         );
 

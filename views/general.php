@@ -21,10 +21,6 @@
     <section id="sc-step-api_key">
         <ul class="sc-list">
             <li>
-                Please enter your StoryChief API-key,
-                if you need help finding your own API-key please click <a href="">here</a>
-            </li>
-            <li>
                 You can change the post type <a href="<?= Storychief\Admin::get_page_url(); ?>">here</a>
             </li>
             <li>
@@ -86,8 +82,7 @@
 
             <p class="submit">
                 <button type="submit" name="submit" id="submit" class="button button-primary">
-                    <?php
-                    esc_attr_e('Next', 'storychief-migration'); ?>
+                    <?php esc_attr_e('Next', 'storychief-migration'); ?>
                 </button>
             </p>
         </form>
@@ -99,8 +94,7 @@
             </p>
             <p class="submit">
                 <button type="submit" name="submit" id="submit" class="button button-primary">
-                    <?php
-                    esc_attr_e('Run migration', 'storychief-migration'); ?>
+                    <?php esc_attr_e('Run migration', 'storychief-migration'); ?>
                 </button>
             </p>
         </form>
@@ -117,13 +111,11 @@
         </div>
     </section>
     <section id="sc-step-completed" hidden>
-        <p>
-            We completed migrating all of your posts.
-        </p>
+        <p>We completed migrating all of your posts.</p>
         <h3>Next steps</h3>
         <ul class="sc-list">
             <li>
-                You can deactivate or remove the plugin StoryChief Migrate
+                You can deactivate or uninstall the plugin StoryChief Migrate
             </li>
         </ul>
     </section>
