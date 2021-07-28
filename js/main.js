@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initMigrate() {
+        const rest_api_url = window.wpStoryChiefMigrate.rest_api_url;
         const http_headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -30,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         async function connection_check() {
-            const response = await fetch('/wp-json/storychief/migrate/connection_check', {
+            const response = await fetch(rest_api_url + 'storychief/migrate/connection_check', {
                 method: 'post',
                 headers: http_headers,
                 credentials: 'same-origin',
@@ -50,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             step3.hidden = true;
             step4.hidden = true;
 
-            fetch('/wp-json/storychief/migrate/destinations', {
+            fetch(rest_api_url + 'storychief/migrate/destinations', {
                 method: 'post',
                 headers: http_headers,
                 credentials: 'same-origin',
@@ -137,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 progress_bar.hidden = false;
                 error.hidden = true;
 
-                const response = await fetch('/wp-json/storychief/migrate/run', {
+                const response = await fetch(rest_api_url + 'storychief/migrate/run', {
                     method: 'post',
                     headers: http_headers,
                     credentials: 'same-origin',

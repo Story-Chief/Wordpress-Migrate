@@ -100,7 +100,7 @@ class Admin
         $total_posts = Admin::get_total_posts();
         $total_completed = Admin::get_total_completed();
         $total_percentage = Admin::get_total_percentage();
-        $completed = $total_percentage >= 100;
+        $completed = (bool)get_sc_option('migrate_completed');
 
         wp_enqueue_style('storychief-migrate-css', $uri.'/css/main.css', null);
         wp_enqueue_script('storychief-migrate-js', $uri.'/js/main.js', null, null, true);

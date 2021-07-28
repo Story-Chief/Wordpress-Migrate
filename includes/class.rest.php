@@ -239,6 +239,7 @@ class Rest extends WP_REST_Controller
 
             $posts_migrated[] = $post->ID;
 
+            // Mark the current post as migrated
             update_sc_option('posts_migrated', $posts_migrated);
 
             // Set the story in SC as published
@@ -270,6 +271,9 @@ class Rest extends WP_REST_Controller
         $total_posts = Admin::get_total_posts();
         $total_completed = Admin::get_total_completed();
         $total_percentage = Admin::get_total_percentage();
+
+        // Mark inside the migration as complete (when 100%), and ignore newer posts
+        update_sc_option('migrate_completed', $total_completed >= $total_posts);
 
         return [
             'data' => [
