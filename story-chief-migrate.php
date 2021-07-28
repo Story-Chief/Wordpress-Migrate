@@ -23,15 +23,15 @@ if (!defined('STORYCHIEF_MIGRATE_DIR')) {
 }
 
 register_uninstall_hook(
-    __DIR__ . '/includes/uninstall.php',
+    __DIR__.'/includes/uninstall.php',
     'storychief_migrate_register_uninstall_hook'
 );
 
 require __DIR__.'/includes/class.rest.php';
 require __DIR__.'/includes/class.admin.php';
 
-if ( is_admin() ) {
+if (is_admin()) {
     add_action('admin_init', [\StorychiefMigrate\Admin::class, 'admin_init']);
     add_action('admin_menu', [\StorychiefMigrate\Admin::class, 'admin_menu']);
-    add_action('rest_api_init', [\StorychiefMigrate\Admin::class, 'admin_json']);
 }
+add_action('rest_api_init', [\StorychiefMigrate\Admin::class, 'admin_json']);
