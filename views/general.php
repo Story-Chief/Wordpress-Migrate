@@ -118,12 +118,12 @@
     </section>
     <section id="sc-step-completed" hidden>
         <p>
-            We completed migrating all of your stories.
+            We completed migrating all of your posts.
         </p>
         <h3>Next steps</h3>
         <ul class="sc-list">
             <li>
-                You can disable or remove this plugin
+                You can deactivate or remove the plugin StoryChief Migrate
             </li>
         </ul>
     </section>
