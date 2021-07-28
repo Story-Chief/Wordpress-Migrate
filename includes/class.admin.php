@@ -5,7 +5,6 @@ namespace StoryChiefMigrate;
 use WP_Query;
 
 use function Storychief\Settings\get_sc_option;
-use function Storychief\Settings\update_sc_option;
 
 class Admin
 {
@@ -14,12 +13,10 @@ class Admin
 
     public static function admin_init()
     {
-        if (
-            isset($_POST['action'], $_POST['_wpnonce']) && $_POST['action'] === 'enter-api-key' &&
-            current_user_can('manage_options')
-        ) {
-            self::save_configuration();
-        }
+        add_filter(
+            'plugin_action_links_story-chief-migrate/story-chief-migrate.php',
+            array(self::class, 'settings_link')
+        );
     }
 
     public static function admin_menu()
@@ -74,19 +71,12 @@ class Admin
         );
     }
 
-    public static function save_configuration()
+    public static function settings_link($links)
     {
-        if (!wp_verify_nonce($_POST['_wpnonce'], self::NONCE)) {
-            return false;
-        }
+        $settings_link = '<a href="' . admin_url('options-general.php?page=storychief-migrate') . '">'.__('Settings').'</a>';
+        array_push($links, $settings_link);
 
-        if (isset($_POST['api_key'])) {
-            update_sc_option('migrate_api_key', $_POST['api_key']);
-        }
-        if (isset($_POST['destination_id'])) {
-            update_sc_option('migrate_destination_id', $_POST['destination_id']);
-        }
-        // TODO: show a success message
+        return $links;
     }
 
     public static function display_configuration_page()
