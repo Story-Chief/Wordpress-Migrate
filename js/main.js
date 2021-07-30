@@ -167,18 +167,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         await new Promise((resolve) => setTimeout(resolve, 60 * 1000)); // Pause
                         progress_label.hidden = false;
                         progress_bar.hidden = false;
-
                     }
                 } else {
                     error.hidden = true;
                     progress_bar.setAttribute('max', json.data.total_posts);
                     progress_bar.value = json.data.total_completed;
                     progress_label.innerText = Math.ceil(json.data.total_percentage) + '%';
+
+                    document.getElementById('sc-run-total-posts').innerText = json.data.total_posts;
+                    document.getElementById('sc-run-total-completed').innerText = json.data.total_completed;
+                    document.getElementById('sc-run-total-success').innerText = json.data.total_completed - json.data.total_failed;
+                    document.getElementById('sc-run-total-failed').innerText = json.data.total_failed;
                 }
 
                 // Delay the next request, to throttle the amount of requests per minute
                 await new Promise((resolve) => setTimeout(resolve, 1500));
             }
+
+            window.onbeforeunload = null;
 
             show_step_4();
         });

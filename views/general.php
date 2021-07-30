@@ -111,6 +111,9 @@
                     You can change the post type <a href="<?= Storychief\Admin::get_page_url(); ?>">here</a>
                 </li>
                 <li>
+                    We recommend running the migration first, through a staging environment if possible
+                </li>
+                <li>
                     We will copy all of your drafts and published posts
                 </li>
                 <li>
@@ -195,11 +198,17 @@
                 <p>
                     Please do not close this tab, while we are migrating your existing stories into StoryChief.
                 </p>
+                <ul class="sc-list">
+                    <li>Total posts: <span id="sc-run-total-posts">?</span></li>
+                    <li>Total completed: <span id="sc-run-total-completed">?</span></li>
+                    <li>Total success: <span id="sc-run-total-success">?</span></li>
+                    <li>Total failed: <span id="sc-run-total-failed">?</span></li>
+                </ul>
+                <hr>
                 <label for="sc-progress-label" id="sc-progress-label">
                     <?= ceil($total_percentage); ?>%
                 </label>
                 <progress id="sc-progress-bar" max="<?= $total_posts; ?>" value="<?= $total_completed; ?>"></progress>
-
                 <div class="update-message notice inline notice-warning notice-alt" hidden="" id="sc-progress-error"></div>
             </div>
         </section>
