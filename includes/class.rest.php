@@ -200,14 +200,15 @@ class Rest extends WP_REST_Controller
             // Developers can use this hook, to add extra parameters such as language, source_id, ...
             // Read more: https://developers.storychief.io/
 
+            $excerpt = !empty($post->post_excerpt) ? $post->post_excerpt : null;
+
             $post_body = [
                 'title' => get_the_title(),
                 'content' => $post_content,
-                'excerpt' => get_the_excerpt(),
                 'slug' => $post->post_name,
                 'custom_fields' => [],
                 'seo_title' => get_the_title(),
-                'seo_description' => get_the_excerpt(),
+                'seo_description' => $excerpt,
                 'categories' => $post_categories,
                 'tags' => $post_tags,
                 'author_id' => $post_author_id,
