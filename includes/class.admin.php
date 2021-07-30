@@ -93,8 +93,9 @@ class Admin
         $total_percentage = Admin::get_total_percentage();
         $completed = (bool)get_sc_option('migrate_completed');
 
-        wp_enqueue_style('storychief-migrate-css', $uri.'/css/main.css', null);
-        wp_enqueue_script('storychief-migrate-js', $uri.'/js/main.js', null, null, true);
+        wp_enqueue_style('storychief-migrate-css', $uri.'/css/main.css', null, filemtime(STORYCHIEF_MIGRATE_DIR . '/css/main.css'));
+        wp_enqueue_script('storychief-migrate-js', $uri.'/js/main.js', null, filemtime(STORYCHIEF_MIGRATE_DIR . '/js/main.js'), true);
+
         wp_localize_script(
             'storychief-migrate-js',
             'wpStoryChiefMigrate',

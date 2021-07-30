@@ -12,11 +12,14 @@ use WP_User_Query;
 
 use function Storychief\Settings\get_sc_option;
 use function Storychief\Settings\update_sc_option;
+use function Storychief\Webhook\storychief_debug_mode;
 
 class Rest extends WP_REST_Controller
 {
     public static function connection_check(WP_REST_Request $request)
     {
+        storychief_debug_mode();
+
         $params = $request->get_json_params();
 
         return [
@@ -34,6 +37,8 @@ class Rest extends WP_REST_Controller
      */
     public static function destinations(WP_REST_Request $request)
     {
+        storychief_debug_mode();
+
         $params = $request->get_json_params();
         $api_key = isset($params['api_key']) ? $params['api_key'] : null;
 
@@ -86,6 +91,8 @@ class Rest extends WP_REST_Controller
      */
     public static function run(WP_REST_Request $request)
     {
+        storychief_debug_mode();
+
         $params = $request->get_json_params();
         $api_key = isset($params['api_key']) ? $params['api_key'] : null;
         $destination_id = isset($params['destination_id']) ? $params['destination_id'] : null;
@@ -283,11 +290,6 @@ class Rest extends WP_REST_Controller
                     continue;
                 }
             }
-
-            $posts_migrated[] = $post->ID;
-
-            // Mark the current post as migrated
-            update_sc_option('posts_migrated', $posts_migrated);
 
             // Set the story in SC as published
             wp_remote_post(

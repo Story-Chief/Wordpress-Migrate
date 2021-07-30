@@ -7,7 +7,7 @@
 /** @var bool $completed */
 ?>
 <?php if ($completed): ?>
-    <div class="wrap">
+    <div class="wrap sc-migrate">
         <h1>StoryChief Migrate</h1>
         <p>
             We completed migrating all of your posts.
@@ -33,9 +33,18 @@
                 <li>
                     Below is a list of posts that failed, with a description
                 </li>
+                <li>
+                    Please view "/wp-content/plugins/story-chief/error.log" to find all errors
+                </li>
             </ul>
 
-            <h3>Posts <span class="dashicons dashicons-admin-post"></span></h3>
+            <h3>Posts (<?php echo $errors->found_posts; ?>)</h3>
+
+            <p>
+                Please contact <u>your developer</u> or send StoryChief an email at
+                <a href="mailto:support@storychief.io">support@storychief.io</a>
+                and we will get back to you as soon as possible.
+            </p>
 
             <table class="wp-list-table widefat fixed striped table-view-list posts">
                 <thead>
@@ -91,11 +100,6 @@
                     <?php endwhile; ?>
                 </tbody>
             </table>
-            <p>
-                Please contact <u>your developer</u> or send StoryChief an email at
-                <a href="mailto:support@storychief.io" target="_blank">support@storychief.io</a>
-                and we will get back to you as soon as possible.
-            </p>
         <?php endif; ?>
     </div>
 <?php else: ?>
@@ -107,10 +111,13 @@
                     You can change the post type <a href="<?= Storychief\Admin::get_page_url(); ?>">here</a>
                 </li>
                 <li>
-                    This will copy all of your drafts and published posts
+                    We will copy all of your drafts and published posts
                 </li>
                 <li>
                     Please keep this tab open, while the migration is running
+                </li>
+                <li>
+                    turn on <a href="<?= Storychief\Admin::get_page_url(); ?>">debug mode</a> on to log any error.
                 </li>
             </ul>
 
