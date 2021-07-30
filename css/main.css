@@ -32,3 +32,11 @@ ul.sc-list > li {
     margin: 5px 0;
     padding: 0;
 }
+
+.sc-migrate .dashicons-image-rotate {
+    color: #2271b1;
+    animation: rotation 4s linear infinite;
+    font-size: 1em;
+    height: 1em;
+    width: auto;
+}

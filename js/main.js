@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const step1 = document.getElementById('sc-step-api_key');
         const step2 = document.getElementById('sc-step-destination_id');
         const step3 = document.getElementById('sc-step-run');
-        const step4 = document.getElementById('sc-step-completed');
 
         /* === REUSABLE FUNCTIONS === */
 
@@ -49,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
             step1.hidden = true;
             step2.hidden = false;
             step3.hidden = true;
-            step4.hidden = true;
 
             fetch(rest_api_url + 'storychief/migrate/destinations', {
                 method: 'post',
@@ -78,14 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
             step1.hidden = true;
             step2.hidden = true;
             step3.hidden = false;
-            step4.hidden = true;
         }
 
         function show_step_4() {
             step1.hidden = true;
             step2.hidden = true;
             step3.hidden = true;
-            step4.hidden = false;
+
+            window.location = window.wpStoryChiefMigrate.settings_url + '&v=' + Date.now();
         }
 
         document.getElementById('sc-form-api_key').addEventListener('submit', async (event) => {

@@ -2,13 +2,13 @@
 
 namespace StoryChiefMigrate;
 
+use WP_Error;
 use WP_Query;
 
 use function Storychief\Settings\get_sc_option;
 
 class Admin
 {
-    const REST_URI = 'https://api.storychief.sc/1.0';
     const NONCE = 'storychief-migrate-update-api-key';
 
     public static function admin_init()
@@ -73,7 +73,8 @@ class Admin
 
     public static function settings_link($links)
     {
-        $settings_link = '<a href="' . admin_url('options-general.php?page=storychief-migrate') . '">'.__('Settings').'</a>';
+        $settings_link = '<a href="'.self::get_settings_url().'">'.__('Settings').'</a>';
+
         array_push($links, $settings_link);
 
         return $links;
@@ -99,6 +100,7 @@ class Admin
             'wpStoryChiefMigrate',
             [
                 'rest_api_url' => rest_url(''),
+                'settings_url' => self::get_settings_url(),
                 'nonce' => wp_create_nonce('wp_rest'),
                 'total_posts' => $total_posts,
                 'total_completed' => $total_completed,
@@ -108,6 +110,16 @@ class Admin
         );
 
         require STORYCHIEF_MIGRATE_DIR.'/views/general.php';
+    }
+
+    public static function get_settings_url()
+    {
+        return admin_url('options-general.php?page=storychief-migrate');
+    }
+
+    public static function get_rest_url()
+    {
+        return defined('STORYCHIEF_REST_URI') ? STORYCHIEF_REST_URI : 'https://api.storychief.io/1.0';
     }
 
     public static function get_total_percentage()
@@ -141,11 +153,36 @@ class Admin
 
     public static function get_total_completed()
     {
-        if (is_array($posts_migrated = get_sc_option('posts_migrated'))) {
-            return count($posts_migrated);
-        }
+        return (new WP_Query(
+            [
+                'post_status' => 'any',
+                'post_type' => get_sc_option('post_type'),
+                'posts_per_page' => 5,
+                'meta_query' => [
+                    [
+                        'key' => 'storychief_migrate_complete',
+                        'compare' => 'EXISTS',
+                    ]
+                ]
+            ]
+        ))->found_posts;
+    }
 
-        return 0;
+    public static function get_errors()
+    {
+        return (new WP_Query(
+            [
+                'post_status' => 'any',
+                'post_type' => get_sc_option('post_type'),
+                'posts_per_page' => 5,
+                'meta_query' => [
+                    [
+                        'key' => 'storychief_migrate_error',
+                        'compare' => 'EXISTS',
+                    ]
+                ]
+            ]
+        ));
     }
 
     /**
@@ -161,7 +198,7 @@ class Admin
         }
 
         $response = wp_remote_get(
-            Admin::REST_URI.'/me',
+            Admin::get_rest_url().'/me',
             [
                 'timeout' => 10,
                 'headers' => [
@@ -172,6 +209,10 @@ class Admin
                 'sslverify' => false,
             ]
         );
+
+        if ($response instanceof WP_Error) {
+            return false;
+        }
 
         return $response['response']['code'] < 400;
     }
@@ -190,7 +231,7 @@ class Admin
         }
 
         $response = wp_remote_get(
-            Admin::REST_URI.'/destinations/'.$destination_id,
+            Admin::get_rest_url().'/destinations/'.$destination_id,
             [
                 'timeout' => 10,
                 'headers' => [

@@ -46,7 +46,7 @@ class Rest extends WP_REST_Controller
         }
 
         $response = wp_remote_get(
-            Admin::REST_URI.'/destinations?destination_type=wordpress',
+            Admin::get_rest_url().'/destinations?destination_type=wordpress',
             [
                 'timeout' => 10,
                 'headers' => [
@@ -108,8 +108,6 @@ class Rest extends WP_REST_Controller
 
         // Mapping of keys between WordPress and StoryChief
         $authors = self::get_authors($api_key);
-        $post_type = get_sc_option('post_type');
-        $posts_migrated = get_sc_option('posts_migrated');
         $categories = self::get_terms($api_key, 'categories');
         $tags = self::get_terms($api_key, 'tags');
 
@@ -124,16 +122,17 @@ class Rest extends WP_REST_Controller
             $authors = [];
         }
 
-        if (!is_array($posts_migrated)) {
-            $posts_migrated = [];
-        }
-
-
         $the_query = new WP_Query(
             [
-                'post_type' => $post_type,
+                'post_status' => 'any',
+                'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => 5,
-                'post__not_in' => $posts_migrated,
+                'meta_query' => [
+                    [
+                        'key' => 'storychief_migrate_complete',
+                        'compare' => 'NOT EXISTS',
+                    ]
+                ]
             ]
         );
 
@@ -209,7 +208,11 @@ class Rest extends WP_REST_Controller
 
             if (has_post_thumbnail()) {
                 $post_body['featured_image'] = get_the_post_thumbnail_url($post->ID, 'full');
-                $post_body['featured_image_alt'] = get_post_meta( get_post_thumbnail_id(), '_wp_attachment_image_alt', true);
+                $post_body['featured_image_alt'] = get_post_meta(
+                    get_post_thumbnail_id(),
+                    '_wp_attachment_image_alt',
+                    true
+                );
             }
 
             $body = apply_filters(
@@ -219,7 +222,7 @@ class Rest extends WP_REST_Controller
             );
 
             $response = wp_remote_post(
-                Admin::REST_URI.'/stories',
+                Admin::get_rest_url().'/stories',
                 [
                     'timeout' => 30,
                     'headers' => [
@@ -231,18 +234,54 @@ class Rest extends WP_REST_Controller
                     'body' => json_encode($body),
                 ]
             );
+            update_post_meta($post->ID, 'storychief_migrate_complete', 1);
 
-            $data = json_decode($response['body'], true);
-
-            if ($response['response']['code'] >= 400) {
-                return new WP_Error(
-                    'invalid_data',
-                    $data['message'], [
-                        'status' => 400,
-                        'errors' => $data['errors'],
-                        'post' => $body,
+            if ($response instanceof WP_Error) {
+                /** @var WP_Error $response */
+                update_post_meta(
+                    $post->ID,
+                    'storychief_migrate_error',
+                    [
+                        'code' => 500,
+                        'message' => $response->get_error_message(),
+                        'type' => 'curl',
+                        'errors' => $response->errors,
                     ]
                 );
+                continue;
+            }
+
+            $data = json_decode($response['body'], true);
+            $code = (int)floor(round($response['response']['code']) / 100) * 100;
+
+            if ($response['response']['code'] >= 400) {
+                if ($code === 400) {
+                    update_post_meta(
+                        $post->ID,
+                        'storychief_migrate_error',
+                        [
+                            'code' => $response['response']['code'],
+                            'message' => $response['response']['message'],
+                            'type' => 'invalid_request',
+                            'errors' => $response['response']['errors'],
+                        ]
+                    );
+                    continue;
+                }
+
+                if ($code === 500) {
+                    update_post_meta(
+                        $post->ID,
+                        'storychief_migrate_error',
+                        [
+                            'code' => $response['response']['code'],
+                            'message' => $response['response']['message'],
+                            'type' => 'internal_server_error',
+                            'errors' => [],
+                        ]
+                    );
+                    continue;
+                }
             }
 
             $posts_migrated[] = $post->ID;
@@ -252,7 +291,7 @@ class Rest extends WP_REST_Controller
 
             // Set the story in SC as published
             wp_remote_post(
-                Admin::REST_URI.'/stories/'.$data['data']['id'].'/destinations',
+                Admin::get_rest_url().'/stories/'.$data['data']['id'].'/destinations',
                 [
                     'method' => 'PUT',
                     'timeout' => 10,
@@ -297,7 +336,7 @@ class Rest extends WP_REST_Controller
     {
         $authors = [];
         $response = wp_remote_get(
-            Admin::REST_URI.'/authors?count=200',
+            Admin::get_rest_url().'/authors?count=200',
             [
                 'timeout' => 10,
                 'headers' => [
@@ -322,7 +361,7 @@ class Rest extends WP_REST_Controller
     {
         $data = [];
         $response = wp_remote_get(
-            Admin::REST_URI.'/'.$type.'?count=500',
+            Admin::get_rest_url().'/'.$type.'?count=500',
             [
                 'timeout' => 10,
                 'headers' => [
@@ -347,9 +386,6 @@ class Rest extends WP_REST_Controller
     {
         $author = [
             'email' => $user->user_email,
-            'firstname' => get_user_meta($user->ID, 'first_name', true),
-            'lastname' => get_user_meta($user->ID, 'last_name', true),
-            'bio' => get_user_meta($user->ID, 'description', true),
             'profile_picture' => get_avatar_url(
                 $user->ID,
                 [
@@ -358,11 +394,25 @@ class Rest extends WP_REST_Controller
             ),
         ];
 
+        $firstname = get_user_meta($user->ID, 'first_name', true);
+        $lastname = get_user_meta($user->ID, 'last_name', true);
+        $bio = get_user_meta($user->ID, 'description', true);
+
+        $author['firstname'] = !empty($firstname) ? $firstname : '-';
+
+        if (!empty($lastname)) {
+            $author['lastname'] = $lastname;
+        }
+
+        if (!empty($bio)) {
+            $author['bio'] = $bio;
+        }
+
         // The hook allows to add a Twitter, Facebook link
         $body = apply_filters('storychief_migrate_alter_create_author', $author, $user);
 
         $response = wp_remote_post(
-            Admin::REST_URI.'/authors',
+            Admin::get_rest_url().'/authors',
             [
                 'timeout' => 10,
                 'headers' => [
@@ -380,10 +430,16 @@ class Rest extends WP_REST_Controller
         return $json['data']['id'];
     }
 
+    /**
+     * @param  string  $api_key
+     * @param  WP_Term  $term
+     * @param  string  $type  'categories' or 'tags'
+     * @return int
+     */
     protected static function create_term($api_key, WP_Term $term, $type)
     {
         $response = wp_remote_post(
-            Admin::REST_URI.'/'.$type,
+            Admin::get_rest_url().'/'.$type,
             [
                 'timeout' => 10,
                 'headers' => [
