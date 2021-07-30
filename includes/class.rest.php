@@ -155,7 +155,7 @@ class Rest extends WP_REST_Controller
             $post_author_id = null;
             $post_content = get_the_content(null, false, $post->ID);
             $post_content = apply_filters('the_content', str_replace(']]>', ']]&gt;', $post_content));
-            $post_content = wp_strip_all_tags($post_content);
+            $post_content = preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', $post_content);
 
             if (!$post_user) {
                 // Edge case:
