@@ -1,10 +1,5 @@
 <?php
-
-/**
- * This will remove all of the meta fields, that was used to track the progression of the migration.
- */
-function storychief_migrate_register_uninstall_hook()
-{
+if (defined('WP_UNINSTALL_PLUGIN')) {
     delete_option('storychief_migrate_completed');
 
     global $wpdb;

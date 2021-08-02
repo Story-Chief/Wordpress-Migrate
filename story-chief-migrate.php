@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Plugin Name: StoryChief Migrate
+ * Plugin Name: StoryChief Migrate COpy
  * Plugin URI: https://storychief.io/wordpress
  * Description: This plugin lets you migrate existing posts to StoryChief.
  * Version: 0.1
@@ -21,11 +21,6 @@ if (!function_exists('add_action')) {
 if (!defined('STORYCHIEF_MIGRATE_DIR')) {
     define('STORYCHIEF_MIGRATE_DIR', __DIR__);
 }
-
-register_uninstall_hook(
-    __DIR__.'/includes/uninstall.php',
-    'storychief_migrate_register_uninstall_hook'
-);
 
 require __DIR__.'/includes/class.rest.php';
 require __DIR__.'/includes/class.admin.php';
