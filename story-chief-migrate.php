@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Plugin Name: StoryChief Migrate COpy
+ * Plugin Name: StoryChief Migrate
  * Plugin URI: https://storychief.io/wordpress
  * Description: This plugin lets you migrate existing posts to StoryChief.
  * Version: 0.1
