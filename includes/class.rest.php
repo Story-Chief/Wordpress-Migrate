@@ -331,7 +331,7 @@ class Rest extends WP_REST_Controller
                 'total_posts' => $total_posts,
                 'total_completed' => $total_completed,
                 'total_percentage' => $total_percentage,
-                'total_failed' => Admin::get_errors()->found_posts,
+                'total_failed' => Admin::total_errors(),
                 'completed' => $total_completed >= $total_posts,
             ],
         ];

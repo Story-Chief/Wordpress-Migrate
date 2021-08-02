@@ -164,7 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         progress_bar.hidden = true;
                         return false;
                     } else {
-                        await new Promise((resolve) => setTimeout(resolve, 60 * 1000)); // Pause
+                        // Pause the request, maybe there where to many requests
+                        await new Promise((resolve) => setTimeout(resolve, 60 * 1000));
                         progress_label.hidden = false;
                         progress_bar.hidden = false;
                     }
@@ -181,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Delay the next request, to throttle the amount of requests per minute
-                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await new Promise((resolve) => setTimeout(resolve, 300));
             }
 
             window.onbeforeunload = null;

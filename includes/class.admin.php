@@ -169,13 +169,30 @@ class Admin
         ))->found_posts;
     }
 
+    public static function total_errors()
+    {
+        return (new WP_Query(
+            [
+                'post_status' => 'any',
+                'post_type' => get_sc_option('post_type'),
+                'posts_per_page' => 1,
+                'meta_query' => [
+                    [
+                        'key' => 'storychief_migrate_error',
+                        'compare' => 'EXISTS',
+                    ]
+                ]
+            ]
+        ))->found_posts;
+    }
+
     public static function get_errors()
     {
         return (new WP_Query(
             [
                 'post_status' => 'any',
                 'post_type' => get_sc_option('post_type'),
-                'posts_per_page' => 5,
+                'posts_per_page' => -1,
                 'meta_query' => [
                     [
                         'key' => 'storychief_migrate_error',
