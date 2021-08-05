@@ -131,9 +131,9 @@ class Rest extends WP_REST_Controller
 
         $the_query = new WP_Query(
             [
-                'post_status' => 'any',
+                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
                 'post_type' => get_sc_option('post_type'),
-                'posts_per_page' => 5,
+                'posts_per_page' => 10,
                 'meta_query' => [
                     [
                         'key' => 'storychief_migrate_complete',
@@ -163,9 +163,11 @@ class Rest extends WP_REST_Controller
                 $post_user = $administrators[0];
             }
 
-            $post_author_id = isset($authors[$post_user->user_email]) ?
-                $authors[$post_user->user_email] :
-                self::create_author($api_key, $post_user);
+            if (isset($authors[$post_user->user_email])) {
+                $post_author_id = $authors[$post_user->user_email];
+            } else {
+                $post_author_id = $authors[$post_user->user_email] = self::create_author($api_key, $post_user);
+            }
 
             foreach (wp_get_post_categories($post->ID) as $category_id) {
                 /** @var WP_Term $category */
@@ -216,12 +218,18 @@ class Rest extends WP_REST_Controller
             ];
 
             if (has_post_thumbnail()) {
-                $post_body['featured_image'] = get_the_post_thumbnail_url($post->ID, 'full');
-                $post_body['featured_image_alt'] = get_post_meta(
-                    get_post_thumbnail_id(),
-                    '_wp_attachment_image_alt',
-                    true
-                );
+                $image = wp_get_attachment_image_src(get_post_thumbnail_id($post->ID), 'large');
+
+                if ($image && isset($image[0])) {
+                    $image_url = str_replace(basename($image[0]), '', $image[0]) . rawurlencode(basename($image[0]));
+                    // Replace white space with %20, or else URL validation fails
+                    $post_body['featured_image'] = $image_url;
+                    $post_body['featured_image_alt'] = get_post_meta(
+                        get_post_thumbnail_id(),
+                        '_wp_attachment_image_alt',
+                        true
+                    );
+                }
             }
 
             $body = apply_filters(
@@ -270,9 +278,9 @@ class Rest extends WP_REST_Controller
                         'storychief_migrate_error',
                         [
                             'code' => $response['response']['code'],
-                            'message' => $response['response']['message'],
+                            'message' => isset($data['message']) ? $data['message'] : $response['response']['message'],
                             'type' => 'invalid_request',
-                            'errors' => $response['response']['errors'],
+                            'errors' => isset($data['errors']) ? $data['errors'] : [],
                         ]
                     );
                     continue;

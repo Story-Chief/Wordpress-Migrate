@@ -145,6 +145,7 @@ class Admin
     {
         return (new WP_Query(
             [
+                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
                 'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => 1,
             ]
@@ -155,7 +156,7 @@ class Admin
     {
         return (new WP_Query(
             [
-                'post_status' => 'any',
+                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
                 'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => 5,
                 'meta_query' => [
@@ -172,7 +173,7 @@ class Admin
     {
         return (new WP_Query(
             [
-                'post_status' => 'any',
+                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
                 'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => 1,
                 'meta_query' => [
@@ -189,7 +190,7 @@ class Admin
     {
         return (new WP_Query(
             [
-                'post_status' => 'any',
+                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
                 'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => -1,
                 'meta_query' => [
