@@ -9,7 +9,6 @@ use function Storychief\Settings\get_sc_option;
 
 class Admin
 {
-    const NONCE = 'storychief-migrate-update-api-key';
 
     public static function admin_init()
     {
