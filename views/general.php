@@ -6,7 +6,7 @@
 /** @var int $total_percentage */
 /** @var bool $completed */
 ?>
-<?php if ($completed): ?>
+<?php if (false && $completed): ?>
     <div class="wrap sc-migrate">
         <h1>StoryChief Migrate</h1>
         <p>
@@ -103,7 +103,8 @@
         <?php endif; ?>
     </div>
 <?php else: ?>
-    <div class="wrap sc-migrate" id="sc-migrate">
+    <div class="wrap sc-migrate" id="sc-migrate"></div>
+    <?php /*
         <section id="sc-step-api_key">
             <h1>StoryChief Migrate</h1>
             <ul class="sc-list">
@@ -213,4 +214,5 @@
             </div>
         </section>
     </div>
+ */ ?>
 <?php endif; ?>

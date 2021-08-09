@@ -5,8 +5,6 @@ namespace StoryChiefMigrate;
 use WP_Error;
 use WP_Query;
 
-use function Storychief\Settings\get_sc_option;
-
 class Admin
 {
 
@@ -81,19 +79,11 @@ class Admin
 
     public static function display_configuration_page()
     {
-        if (!defined('STORYCHIEF_DIR')) {
-            // Show an error, that the main plugin needs to be installed
-            return require STORYCHIEF_MIGRATE_DIR.'/views/error-dependency.php';
-        }
-
         $uri = plugin_dir_url(STORYCHIEF_MIGRATE_DIR.'/index.php');
-        $total_posts = Admin::get_total_posts();
-        $total_completed = Admin::get_total_completed();
-        $total_percentage = Admin::get_total_percentage();
-        $completed = (bool)get_sc_option('migrate_completed');
+        $completed = (bool)get_option('storychief_migrate_completed');
 
         wp_enqueue_style('storychief-migrate-css', $uri.'/css/main.css', null, filemtime(STORYCHIEF_MIGRATE_DIR . '/css/main.css'));
-        wp_enqueue_script('storychief-migrate-js', $uri.'/js/main.js', null, filemtime(STORYCHIEF_MIGRATE_DIR . '/js/main.js'), true);
+        wp_enqueue_script('storychief-migrate-js', $uri.'/dist/main.bundle.js', null, filemtime(STORYCHIEF_MIGRATE_DIR . '/dist/main.bundle.js'), true);
 
         wp_localize_script(
             'storychief-migrate-js',
@@ -102,9 +92,6 @@ class Admin
                 'rest_api_url' => rest_url(''),
                 'settings_url' => self::get_settings_url(),
                 'nonce' => wp_create_nonce('wp_rest'),
-                'total_posts' => $total_posts,
-                'total_completed' => $total_completed,
-                'total_percentage' => $total_percentage,
                 'completed' => $completed,
             ]
         );
@@ -112,20 +99,20 @@ class Admin
         require STORYCHIEF_MIGRATE_DIR.'/views/general.php';
     }
 
-    public static function get_settings_url()
+    public static function get_settings_url(): string
     {
         return admin_url('options-general.php?page=storychief-migrate');
     }
 
-    public static function get_rest_url()
+    public static function get_rest_url(): string
     {
         return defined('STORYCHIEF_REST_URI') ? STORYCHIEF_REST_URI : 'https://api.storychief.io/1.0';
     }
 
-    public static function get_total_percentage()
+    public static function get_total_percentage(string $post_type)
     {
-        $total_posts = Admin::get_total_posts();
-        $total_completed = Admin::get_total_completed();
+        $total_posts = Admin::get_total_posts($post_type);
+        $total_completed = Admin::get_total_completed($post_type);
 
         if (!$total_posts) {
             return 100;
@@ -134,30 +121,30 @@ class Admin
         return $total_completed <= $total_posts ? ($total_completed / $total_posts * 100) : 100;
     }
 
-    public static function get_page_url()
+    public static function get_page_url(): string
     {
         $args = ['page' => 'storychief-migrate'];
 
         return add_query_arg($args, admin_url('options-general.php'));
     }
 
-    public static function get_total_posts()
+    public static function get_total_posts(string $post_type): int
     {
         return (new WP_Query(
             [
                 'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
+                'post_type' => $post_type,
                 'posts_per_page' => 1,
             ]
         ))->found_posts;
     }
 
-    public static function get_total_completed()
+    public static function get_total_completed(string $post_type): int
     {
         return (new WP_Query(
             [
                 'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
+                'post_type' => $post_type,
                 'posts_per_page' => 5,
                 'meta_query' => [
                     [
@@ -169,12 +156,11 @@ class Admin
         ))->found_posts;
     }
 
-    public static function total_errors()
+    public static function total_errors(): int
     {
         return (new WP_Query(
             [
                 'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => 1,
                 'meta_query' => [
                     [
@@ -186,12 +172,12 @@ class Admin
         ))->found_posts;
     }
 
-    public static function get_errors()
+    public static function get_errors(): WP_Query
     {
         return (new WP_Query(
             [
                 'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
+                'post_type' => get_option('storychief_post_type'),
                 'posts_per_page' => -1,
                 'meta_query' => [
                     [
@@ -209,7 +195,7 @@ class Admin
      * @param  string  $api_key
      * @return bool
      */
-    public static function connection_check($api_key)
+    public static function connection_check(string $api_key): bool
     {
         if (empty($api_key)) {
             return false;
@@ -238,11 +224,11 @@ class Admin
     /**
      * Detect if the channel exists and is configured correctly as a WordPress website.
      *
-     * @param $api_key
-     * @param $destination_id
+     * @param  string  $api_key
+     * @param  int  $destination_id
      * @return bool
      */
-    public static function destination_exists($api_key, $destination_id)
+    public static function destination_exists(string $api_key, int $destination_id): bool
     {
         if (empty($destination_id)) {
             return false;

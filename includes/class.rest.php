@@ -16,7 +16,7 @@ use function Storychief\Webhook\storychief_debug_mode;
 
 class Rest extends WP_REST_Controller
 {
-    public static function connection_check(WP_REST_Request $request)
+    public static function connection_check(WP_REST_Request $request): array
     {
         storychief_debug_mode();
 
@@ -24,7 +24,7 @@ class Rest extends WP_REST_Controller
 
         return [
             'data' => [
-                'success' => Admin::connection_check(isset($params['api_key']) ? $params['api_key'] : null),
+                'success' => Admin::connection_check($params['api_key'] ?? null),
             ],
         ];
     }
@@ -37,10 +37,8 @@ class Rest extends WP_REST_Controller
      */
     public static function destinations(WP_REST_Request $request)
     {
-        storychief_debug_mode();
-
         $params = $request->get_json_params();
-        $api_key = isset($params['api_key']) ? $params['api_key'] : null;
+        $api_key = $params['api_key'] ?? null;
 
         if (!Admin::connection_check($api_key)) {
             return new WP_Error(
@@ -91,11 +89,9 @@ class Rest extends WP_REST_Controller
      */
     public static function run(WP_REST_Request $request)
     {
-        storychief_debug_mode();
-
         $params = $request->get_json_params();
-        $api_key = isset($params['api_key']) ? $params['api_key'] : null;
-        $destination_id = isset($params['destination_id']) ? $params['destination_id'] : null;
+        $api_key = $params['api_key'] ?? null;
+        $destination_id = $params['destination_id'] ?? null;
 
         if (!Admin::connection_check($api_key)) {
             return new WP_Error(
@@ -134,6 +130,8 @@ class Rest extends WP_REST_Controller
                 'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
                 'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => 10,
+                'orderby' => 'ID',
+                'order' => 'ASC',
                 'meta_query' => [
                     [
                         'key' => 'storychief_migrate_complete',
@@ -221,7 +219,7 @@ class Rest extends WP_REST_Controller
                 $image = wp_get_attachment_image_src(get_post_thumbnail_id($post->ID), 'large');
 
                 if ($image && isset($image[0])) {
-                    $image_url = str_replace(basename($image[0]), '', $image[0]) . rawurlencode(basename($image[0]));
+                    $image_url = str_replace(basename($image[0]), '', $image[0]).rawurlencode(basename($image[0]));
                     // Replace white space with %20, or else URL validation fails
                     $post_body['featured_image'] = $image_url;
                     $post_body['featured_image_alt'] = get_post_meta(
