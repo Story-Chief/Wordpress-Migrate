@@ -144,62 +144,74 @@ class Admin
     public static function get_total_posts()
     {
         return (new WP_Query(
-            [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
-                'posts_per_page' => 1,
-            ]
+            apply_filters('storychief_migrate_wp_query', 
+                [
+                    'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
+                    'post_type' => get_sc_option('post_type'),
+                    'posts_per_page' => 1,
+                ], 
+                'get_total_posts'
+            )
         ))->found_posts;
     }
 
     public static function get_total_completed()
     {
         return (new WP_Query(
-            [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
-                'posts_per_page' => 5,
-                'meta_query' => [
-                    [
-                        'key' => 'storychief_migrate_complete',
-                        'compare' => 'EXISTS',
+            apply_filters('storychief_migrate_wp_query', 
+                [
+                    'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
+                    'post_type' => get_sc_option('post_type'),
+                    'posts_per_page' => 5,
+                    'meta_query' => [
+                        [
+                            'key' => 'storychief_migrate_complete',
+                            'compare' => 'EXISTS',
+                        ]
                     ]
-                ]
-            ]
+                ], 
+                'get_total_completed'
+            )
         ))->found_posts;
     }
 
     public static function total_errors()
     {
         return (new WP_Query(
-            [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
-                'posts_per_page' => 1,
-                'meta_query' => [
-                    [
-                        'key' => 'storychief_migrate_error',
-                        'compare' => 'EXISTS',
+            apply_filters('storychief_migrate_wp_query', 
+                [
+                    'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
+                    'post_type' => get_sc_option('post_type'),
+                    'posts_per_page' => 1,
+                    'meta_query' => [
+                        [
+                            'key' => 'storychief_migrate_error',
+                            'compare' => 'EXISTS',
+                        ]
                     ]
-                ]
-            ]
+                ],
+                'total_errors'
+            )
         ))->found_posts;
     }
 
     public static function get_errors()
     {
         return (new WP_Query(
-            [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_sc_option('post_type'),
-                'posts_per_page' => -1,
-                'meta_query' => [
-                    [
-                        'key' => 'storychief_migrate_error',
-                        'compare' => 'EXISTS',
+            apply_filters('storychief_migrate_wp_query', 
+                [
+                    'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
+                    'post_type' => get_sc_option('post_type'),
+                    'posts_per_page' => -1,
+                    'meta_query' => [
+                        [
+                            'key' => 'storychief_migrate_error',
+                            'compare' => 'EXISTS',
+                        ]
                     ]
-                ]
-            ]
+                ],
+                'get_errors'
+            )
         ));
     }
 

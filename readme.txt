@@ -103,6 +103,32 @@ add_filter('storychief_migrate_alter_create_author', 'example_storychief_migrate
 
 ```
 
+==== Filter: storychief_migrate_wp_query ====
+
+This hooks allows you, to alter the parameters send to WP Query. This can be useful to modify the post type or only migrate posts that contains a specific category.
+
+* [WP Query documentation](https://developer.wordpress.org/reference/classes/wp_query/)
+
+```php
+<?php
+function example_storychief_migrate_wp_query (array $query_args, $query_type) {
+    // documentation: https://developer.wordpress.org/reference/classes/wp_query/#parameters
+    
+    // 1. example: Override the post type value
+    $query_args['post_type'] = 'vlog';
+
+    // 2. example: only get posts that contain a specific category
+    // documentation: https://developer.wordpress.org/reference/classes/wp_query/#category-parameters
+    $query_args['category__in'] = [20];
+
+    $query_args['post_status'] = ['publish']; // Only retrieve published posts and ignore drafts
+
+    return $query_args;
+}
+add_filter('storychief_migrate_wp_query', 'example_storychief_migrate_wp_query', null, 2);
+
+```
+
 == Installation ==
 
 1.  Upload the plugin files to the `/wp-content/plugins/plugin-name` directory, or install the plugin through the WordPress plugins screen directly.

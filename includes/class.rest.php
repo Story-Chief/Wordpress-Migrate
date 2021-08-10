@@ -129,19 +129,22 @@ class Rest extends WP_REST_Controller
             $authors = [];
         }
 
-        $the_query = new WP_Query(
+        $the_query = new WP_Query(apply_filters('storychief_migrate_wp_query', 
             [
                 'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
                 'post_type' => get_sc_option('post_type'),
                 'posts_per_page' => 10,
+                'orderby' => 'ID',
+                'order' => 'ASC',
                 'meta_query' => [
                     [
                         'key' => 'storychief_migrate_complete',
                         'compare' => 'NOT EXISTS',
                     ]
                 ]
-            ]
-        );
+            ],
+            'run',
+        ));
 
         while ($the_query->have_posts()) {
             $the_query->the_post();
@@ -349,7 +352,7 @@ class Rest extends WP_REST_Controller
     {
         $authors = [];
         $response = wp_remote_get(
-            Admin::get_rest_url().'/authors?count=200',
+            Admin::get_rest_url().'/authors?count=100',
             [
                 'timeout' => 10,
                 'headers' => [
@@ -373,23 +376,34 @@ class Rest extends WP_REST_Controller
     protected static function get_terms($api_key, $type)
     {
         $data = [];
-        $response = wp_remote_get(
-            Admin::get_rest_url().'/'.$type.'?count=500',
-            [
-                'timeout' => 10,
-                'headers' => [
-                    'Accept' => 'application/json',
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer '.$api_key,
-                ],
-                'sslverify' => false,
-            ]
-        );
+        $api_url = Admin::get_rest_url().'/'.$type.'?count=100&page=1';
 
-        $json = json_decode($response['body'], true);
+        while($api_url) {
+            $response = wp_remote_get(
+                $api_url,
+                [
+                    'timeout' => 10,
+                    'headers' => [
+                        'Accept' => 'application/json',
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer '.$api_key,
+                    ],
+                    'sslverify' => false,
+                ]
+            );
+    
+            $json = json_decode($response['body'], true);
+    
+            foreach ($json['data'] as $row) {
+                $data[$row['slug']] = $row['id'];
+            }
 
-        foreach ($json['data'] as $row) {
-            $data[$row['slug']] = $row['id'];
+            if (isset($json['meta']['pagination']['links']['next'])) {
+                // Do this when StoryChief contains more than 100 categories / tags
+                $api_url = $json['meta']['pagination']['links']['next'];
+            } else {
+                break;
+            }
         }
 
         return $data;
