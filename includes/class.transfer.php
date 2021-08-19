@@ -123,6 +123,7 @@ class Transfer
 
                 if ($image && isset($image[0])) {
                     $image_url = str_replace(basename($image[0]), '', $image[0]).rawurlencode(basename($image[0]));
+
                     // Replace white space with %20, or else URL validation fails
                     $post_body['featured_image'] = $image_url;
                     $post_body['featured_image_alt'] = get_post_meta(

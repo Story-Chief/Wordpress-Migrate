@@ -148,7 +148,9 @@ ul.scm-list > li {
 .scm-progress-bar-meter[value]::-webkit-progress-bar {
     background: #06fcb4;
 }
-
-.scm-button-retry.scm-button-retry--loading {
+.scm-button-retry .dashicons {
+    display: inline-block;
+}
+.scm-button-retry.scm-button-retry--loading .dashicons {
     animation: rotation 4s linear infinite;
 }

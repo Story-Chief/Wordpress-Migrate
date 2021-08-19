@@ -25,7 +25,7 @@ class Rest extends WP_REST_Controller
         $params = $request->get_json_params();
 
         if (extension_loaded('openssl')) {
-            update_option('storychief_migrate_api_key', Admin::encrypt($params['api_key']), false);
+            update_option('storychief_migrate_api_key', Admin::encrypt($params['api_key'], get_option('storychief_migrate_encryption_key')));
         }
 
         return [
@@ -49,7 +49,7 @@ class Rest extends WP_REST_Controller
 
         return [
             'data' => [
-                'api_key' => $api_key ? Admin::decrypt($api_key) : null,
+                'api_key' => $api_key ? Admin::decrypt($api_key, get_option('storychief_migrate_encryption_key')) : null,
             ],
         ];
     }
@@ -265,7 +265,7 @@ class Rest extends WP_REST_Controller
     {
         $params = $request->get_json_params();
         $post_id = $params['post_id'] ?? null;
-        $api_key = Admin::decrypt(get_option('storychief_migrate_api_key'));
+        $api_key = Admin::decrypt(get_option('storychief_migrate_api_key'), get_option('storychief_migrate_encryption_key'));
 
         if (!Admin::connection_check($api_key)) {
             return self::errorConnection();

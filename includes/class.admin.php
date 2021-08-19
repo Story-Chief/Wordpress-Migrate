@@ -12,6 +12,10 @@ class Admin
 
     public static function admin_init()
     {
+        if (!get_option('storychief_migrate_encryption_key')) {
+            update_option('storychief_migrate_encryption_key', Admin::generate_key());
+        }
+
         add_filter(
             'plugin_action_links_story-chief-migrate/story-chief-migrate.php',
             array(self::class, 'settings_link')
@@ -500,7 +504,7 @@ class Admin
 
             if (isset($json['meta']['pagination']['links']['next'])) {
                 // Do this when StoryChief contains more than 100 categories / tags
-                $api_url = $json['meta']['pagination']['links']['next'] . '&count=100';
+                $api_url = $json['meta']['pagination']['links']['next'].'&count=100';
             } else {
                 break;
             }
@@ -590,10 +594,9 @@ class Admin
     }
 
 
-    public static function encrypt(string $data): string
+    public static function encrypt(string $data, string $encryption_key): string
     {
-        $encryption_key = openssl_digest(php_uname(), 'MD5', TRUE);
-        $key = hex2bin($encryption_key);
+        $key = hash('sha256', $encryption_key);
         $ivLength = openssl_cipher_iv_length('AES-256-CTR');
         $randomBytes = openssl_random_pseudo_bytes($ivLength);
 
@@ -608,10 +611,9 @@ class Admin
         return base64_encode($randomBytes.$ciphertext);
     }
 
-    public static function decrypt(string $data): string
+    public static function decrypt(string $data, string $description_key): string
     {
-        $decryption_key = openssl_digest(php_uname(), 'MD5', TRUE);
-        $key = hex2bin($decryption_key);
+        $key = hash('sha256', $description_key);
         $data = base64_decode($data);
         $ivLength = openssl_cipher_iv_length('AES-256-CTR');
         $randomBytes = mb_substr($data, 0, $ivLength, '8bit');
