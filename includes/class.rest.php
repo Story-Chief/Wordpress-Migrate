@@ -24,7 +24,9 @@ class Rest extends WP_REST_Controller
     {
         $params = $request->get_json_params();
 
-        update_option('storychief_migrate_api_key', Admin::encrypt($params['api_key']), false);
+        if (extension_loaded('openssl')) {
+            update_option('storychief_migrate_api_key', Admin::encrypt($params['api_key']), false);
+        }
 
         return [
             'data' => [
@@ -35,6 +37,14 @@ class Rest extends WP_REST_Controller
 
     public static function get_api_key(WP_REST_Request $request): array
     {
+        if (!extension_loaded('openssl')) {
+            return [
+                'data' => [
+                    'api_key' => null,
+                ],
+            ];
+        }
+
         $api_key = get_option('storychief_migrate_api_key');
 
         return [

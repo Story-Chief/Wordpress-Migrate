@@ -500,7 +500,7 @@ class Admin
 
             if (isset($json['meta']['pagination']['links']['next'])) {
                 // Do this when StoryChief contains more than 100 categories / tags
-                $api_url = $json['meta']['pagination']['links']['next'];
+                $api_url = $json['meta']['pagination']['links']['next'] . '&count=100';
             } else {
                 break;
             }
