@@ -57,10 +57,34 @@ class Admin
 
         register_rest_route(
             'storychief/migrate',
+            'preview',
+            array(
+                'methods' => 'POST',
+                'callback' => [Rest::class, 'preview'],
+                'permission_callback' => function () {
+                    return current_user_can('manage_options');
+                },
+            )
+        );
+
+        register_rest_route(
+            'storychief/migrate',
             'run',
             array(
                 'methods' => 'POST',
                 'callback' => [Rest::class, 'run'],
+                'permission_callback' => function () {
+                    return current_user_can('manage_options');
+                },
+            )
+        );
+
+        register_rest_route(
+            'storychief/migrate',
+            'errors',
+            array(
+                'methods' => 'POST',
+                'callback' => [Rest::class, 'errors'],
                 'permission_callback' => function () {
                     return current_user_can('manage_options');
                 },
@@ -82,17 +106,109 @@ class Admin
         $uri = plugin_dir_url(STORYCHIEF_MIGRATE_DIR.'/index.php');
         $completed = (bool)get_option('storychief_migrate_completed');
 
-        wp_enqueue_style('storychief-migrate-css', $uri.'/css/main.css', null, filemtime(STORYCHIEF_MIGRATE_DIR . '/css/main.css'));
-        wp_enqueue_script('storychief-migrate-js', $uri.'/dist/main.bundle.js', null, filemtime(STORYCHIEF_MIGRATE_DIR . '/dist/main.bundle.js'), true);
+        // todo: clean-up to a different method
+        $post_types = [];
+        $post_types_raw = get_post_types(['public' => true, 'show_in_menu' => true], 'objects');
+
+        foreach ($post_types_raw as $post_type) {
+            if (in_array($post_type->name, ['page', 'attachment'])) {
+                continue;
+            }
+
+            $taxonomies = get_taxonomies(
+                [
+                    'object_type' => [$post_type->name],
+                    'show_in_menu' => true,
+                ],
+                'objects'
+            );
+
+            $post_types[$post_type->name] = [
+                'name' => $post_type->name,
+                'label' => $post_type->label,
+                'taxonomies' => array_values(
+                    array_map(function ($taxonomy) {
+                        return [
+                            'name' => $taxonomy->name,
+                            'label' => $taxonomy->label,
+                        ];
+                    }, $taxonomies)
+                ),
+                'taxonomy_objects' => []
+            ];
+
+            foreach ($taxonomies as $taxonomy) {
+                $terms = get_terms(['taxonomy' => $taxonomy->name, 'hide_empty' => true]);
+
+                if (count($terms)) {
+                    $post_types[$post_type->name]['taxonomy_objects'][$taxonomy->name] = [
+                        'name' => $taxonomy->name,
+                        'label' => $taxonomy->label,
+                        'post_type' => $post_type->name,
+                        'items' => []
+                    ];
+
+                    foreach ($terms as $term) {
+                        $the_query = new WP_Query(
+                            [
+                                'post_status' => [
+                                    'publish',
+                                    'draft',
+                                    'pending',
+                                    'future',
+                                    'private'
+                                ],
+                                'post_type' => $post_type->name,
+                                'category__in' => [$term->term_id],
+                                'posts_per_page' => 1,
+                            ]
+                        );
+
+                        $post_types[$post_type->name]['taxonomy_objects'][$taxonomy->name]['items'][] = [
+                            'value' => $term->term_id,
+                            'label' => $term->name,
+                            'total' => $the_query->found_posts,
+                        ];
+                    }
+                }
+            }
+
+            // Filter out taxonomy types without items
+            $post_types[$post_type->name]['taxonomy_objects'] = array_filter(
+                $post_types[$post_type->name]['taxonomy_objects'],
+                function (array $taxonomy) {
+                    return count($taxonomy['items']);
+                }
+            );
+            $post_types[$post_type->name]['taxonomy_objects'] = array_values(
+                $post_types[$post_type->name]['taxonomy_objects']
+            );
+        }
+
+
+        wp_enqueue_style(
+            'storychief-migrate-css',
+            $uri.'/css/main.css',
+            null,
+            filemtime(STORYCHIEF_MIGRATE_DIR.'/css/main.css')
+        );
+        wp_enqueue_script(
+            'storychief-migrate-js',
+            $uri.'/dist/main.bundle.js',
+            null,
+            filemtime(STORYCHIEF_MIGRATE_DIR.'/dist/main.bundle.js'),
+            true
+        );
 
         wp_localize_script(
             'storychief-migrate-js',
-            'wpStoryChiefMigrate',
+            'scm',
             [
                 'rest_api_url' => rest_url(''),
                 'settings_url' => self::get_settings_url(),
                 'nonce' => wp_create_nonce('wp_rest'),
                 'completed' => $completed,
+                'post_types' => $post_types,
             ]
         );
 
@@ -109,10 +225,10 @@ class Admin
         return defined('STORYCHIEF_REST_URI') ? STORYCHIEF_REST_URI : 'https://api.storychief.io/1.0';
     }
 
-    public static function get_total_percentage(string $post_type)
+    public static function get_total_percentage(string $post_type, array $params)
     {
-        $total_posts = Admin::get_total_posts($post_type);
-        $total_completed = Admin::get_total_completed($post_type);
+        $total_posts = Admin::get_total_posts($post_type, $params);
+        $total_completed = Admin::get_total_completed($post_type, $params);
 
         if (!$total_posts) {
             return 100;
@@ -128,65 +244,82 @@ class Admin
         return add_query_arg($args, admin_url('options-general.php'));
     }
 
-    public static function get_total_posts(string $post_type): int
+    public static function prepare_query(string $post_type, array $filters): array
     {
+        $post_query = [
+            'post_type' => $post_type,
+            'post_status' => $filters['post_status'],
+            'posts_per_page' => 10,
+            'orderby' => 'ID',
+            'order' => 'ASC',
+            'fields' => 'ids'
+        ];
+
+        if (isset($filters['filter_terms']) && is_array($filters['filter_terms']) && count($filters['filter_terms'])) {
+            $post_query['category__in'] = $filters['filter_terms'];
+        }
+
+        return $post_query;
+    }
+
+    public static function get_total_posts(string $post_type, $params): int
+    {
+        $post_query = Admin::prepare_query($post_type, $params);
+        $post_query['posts_per_page'] = 1;
+
         return (new WP_Query(
-            [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => $post_type,
-                'posts_per_page' => 1,
-            ]
+            apply_filters('storychief_migrate_wp_query', $post_query, 'get_total_posts')
         ))->found_posts;
     }
 
-    public static function get_total_completed(string $post_type): int
+    public static function get_total_completed(string $post_type, array $params): int
     {
-        return (new WP_Query(
+        $post_query = Admin::prepare_query($post_type, $params);
+        $post_query['posts_per_page'] = 1;
+        $post_query['meta_query'] = [
             [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => $post_type,
-                'posts_per_page' => 5,
-                'meta_query' => [
-                    [
-                        'key' => 'storychief_migrate_complete',
-                        'compare' => 'EXISTS',
-                    ]
-                ]
+                'key' => 'storychief_migrate_complete',
+                'compare' => 'EXISTS',
             ]
+        ];
+
+        return (new WP_Query(
+            apply_filters('storychief_migrate_wp_query', $post_query, 'get_total_completed')
         ))->found_posts;
     }
 
-    public static function total_errors(): int
+    public static function total_errors(string $post_type, array $params): int
     {
-        return (new WP_Query(
+        $post_query = Admin::prepare_query($post_type, $params);
+        $post_query['posts_per_page'] = 1;
+        $post_query['meta_query'] = [
             [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'posts_per_page' => 1,
-                'meta_query' => [
-                    [
-                        'key' => 'storychief_migrate_error',
-                        'compare' => 'EXISTS',
-                    ]
-                ]
+                'key' => 'storychief_migrate_error',
+                'compare' => 'EXISTS',
             ]
+        ];
+
+        return (new WP_Query(
+            apply_filters('storychief_migrate_wp_query', $post_query, 'total_errors')
         ))->found_posts;
     }
 
     public static function get_errors(): WP_Query
     {
-        return (new WP_Query(
-            [
-                'post_status' => ['publish', 'draft', 'pending', 'future', 'private'],
-                'post_type' => get_option('storychief_post_type'),
-                'posts_per_page' => -1,
-                'meta_query' => [
-                    [
-                        'key' => 'storychief_migrate_error',
-                        'compare' => 'EXISTS',
-                    ]
+        $post_query = [
+            'post_status' => ['publish', 'draft', 'future', 'private'],
+            'posts_per_page' => -1,
+            'orderby' => 'ID',
+            'order' => 'ASC',
+            'meta_query' => [
+                [
+                    'key' => 'storychief_migrate_error',
+                    'compare' => 'EXISTS',
                 ]
-            ]
-        ));
+            ],
+        ];
+
+        return new WP_Query($post_query);
     }
 
     /**

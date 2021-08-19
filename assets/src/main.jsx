@@ -1,38 +1,17 @@
-import React, {useState} from 'react';
+import React, {useContext} from 'react';
 import {render} from 'react-dom';
-import PanelApiKey from "./Components/PanelApiKey";
+import {ContextWrapper, StoryChiefContext} from "./StoryChiefContext";
+import PageGeneral from "./Components/PageGeneral";
+import PageCompleted from "./Components/PageCompleted";
 
-const scMigrateNode = document.getElementById('sc-migrate');
+const scmRootNode = document.getElementById('scm-root');
 
-if (scMigrateNode) {
+if (scmRootNode) {
     function App() {
-        const [apiKey, setApiKey] = useState(null);
+        const {completed} = useContext(StoryChiefContext);
 
-        const [activePanel, setActivePanel] = useState('configuration');
-
-        function handleApiKey(apiKey) {
-            apiKey(apiKey);
-        }
-
-        return <>
-            <h1>StoryChief Migrate</h1>
-            <ul className="sc-list">
-                <li>
-                    We recommend running the migration first, through a staging environment if possible
-                </li>
-                <li>
-                    We will copy all of your drafts and published posts
-                </li>
-                <li>
-                    Please keep this tab open, while the migration is running
-                </li>
-            </ul>
-
-            <section>
-                <PanelApiKey activePanel={activePanel} open={activePanel==='api_key'} handleApiKey={handleApiKey} />
-            </section>
-        </>;
+        return completed ? <PageCompleted/> : <PageGeneral/>;
     }
 
-    render(<App settings={window.wpStoryChiefMigrate}/>, scMigrateNode)
+    render(<ContextWrapper><App/></ContextWrapper>, scmRootNode);
 }

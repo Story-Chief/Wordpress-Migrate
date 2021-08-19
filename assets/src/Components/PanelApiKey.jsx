@@ -1,49 +1,49 @@
-import React, {useState} from 'react';
+import React, {useContext, useState} from 'react';
 import PropTypes from 'prop-types';
+import {StoryChiefContext} from "../StoryChiefContext";
+import FormError from "./FormError";
+import {connectionCheck} from "../Services/Requests";
+import PanelHeading from "./Partials/PanelHeading";
 
 const propTypes = {
-    activePanel: PropTypes.string.isRequired,
-    handleApiKey: PropTypes.func.isRequired,
+    open: PropTypes.bool.isRequired,
 }
 
-function PanelApiKey({open, handleApiKey}) {
-    const [apiKey, setApiKey] = useState(null);
+function PanelApiKey({open}) {
+    const {apiKey, setApiKey, dispatchFilters, setActivePanel} = useContext(StoryChiefContext);
     const [showError, setShowError] = useState(null);
+    const [disabled, setDisabled] = useState(false);
 
     async function handleSubmit(event) {
         event.preventDefault();
 
         setShowError(false);
 
-        const rest_api_url = window.wpStoryChiefMigrate.rest_api_url;
-        const response = await fetch(rest_api_url + 'storychief/migrate/connection_check', {
-            method: 'post',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Cache': 'no-cache',
-                'X-WP-Nonce': window.wpStoryChiefMigrate.nonce,
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                api_key: apiKey,
-            }),
-        });
+        const success = await connectionCheck(apiKey);
 
-        const json = await response.json();
-
-        if (json.data.success) {
-            handleApiKey(apiKey);
+        if (success) {
+            dispatchFilters({
+                type: 'update',
+                value: {},
+            });
+            setDisabled(true);
+            setActivePanel('configuration');
         } else {
             setShowError(true);
         }
     }
 
     return <>
-        <details className="sc-panel" open={open}>
-            <summary className="sc-panel-heading">API-key</summary>
-            <div className="sc-panel-body">
+        <article className="scm-panel">
+            <PanelHeading open={open} disabled={disabled}>
+                API-key
+            </PanelHeading>
+            {open && <section className="scm-panel-body">
                 <form action="#" method="post" onSubmit={handleSubmit}>
+                    <p>
+                        Please enter the API-key you created in StoryChief, under Account Settings > API > Your keys.
+                    </p>
+
                     <table className="form-table">
                         <tbody>
                         <tr>
@@ -53,15 +53,29 @@ function PanelApiKey({open, handleApiKey}) {
                                 </label>
                             </th>
                             <td>
-                                <textarea name="api_key" id="api_key" rows="10" autoComplete="off" value={apiKey}
-                                          onChange={({target}) => setApiKey(target.value)}/>
+                                <textarea
+                                        name="api_key"
+                                        id="api_key"
+                                        rows="10"
+                                        autoComplete="off"
+                                        value={apiKey || ''}
+                                        onChange={({target}) => setApiKey(target.value)}/>
+
                             </td>
                         </tr>
                         </tbody>
                     </table>
+
+                    {showError && <FormError message="Sorry, the API-key you entered is incorrect." />}
+
+                    <p className="submit">
+                        <button type="submit" name="submit" id="submit" className="button button-primary" disabled={!apiKey}>
+                            Next
+                        </button>
+                    </p>
                 </form>
-            </div>
-        </details>
+            </section>}
+        </article>
     </>
 }
 
