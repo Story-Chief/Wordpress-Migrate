@@ -27,6 +27,40 @@ export async function connectionCheck(apiKey) {
     return json.data.success;
 }
 
+export async function saveApiKey(apiKey) {
+    const response = await fetch(restApiUrl + 'storychief/migrate/save_api_key', {
+        method: 'post',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache': 'no-cache',
+            'X-WP-Nonce': nonce,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            api_key: apiKey,
+        }),
+    });
+
+    return await response.json();
+}
+
+export async function getApiKey() {
+    const response = await fetch(restApiUrl + 'storychief/migrate/get_api_key', {
+        method: 'post',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache': 'no-cache',
+            'X-WP-Nonce': nonce,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+    });
+
+    return await response.json();
+}
+
 export async function fetchDestinations(apiKey) {
     const response = await fetch(restApiUrl + 'storychief/migrate/destinations', {
         method: 'post',

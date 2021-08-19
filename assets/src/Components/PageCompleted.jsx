@@ -47,7 +47,18 @@ function PageCompleted() {
         setErrors([...errors]);
 
         retry(apiKey, ID).then((response) => {
-            
+
+            const temp = [...errors];
+            const index = temp.findIndex(post => +post.ID === ID);
+
+            if (response.data.success) {
+                temp.splice(index, 1);
+
+            } else {
+                temp[index] = response.data.error;
+            }
+
+            setErrors(temp);
         });
     }
 

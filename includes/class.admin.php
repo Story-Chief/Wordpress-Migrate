@@ -4,6 +4,8 @@ namespace StoryChiefMigrate;
 
 use WP_Error;
 use WP_Query;
+use WP_Term;
+use WP_User;
 
 class Admin
 {
@@ -43,6 +45,31 @@ class Admin
                 },
             )
         );
+
+        register_rest_route(
+            'storychief/migrate',
+            'save_api_key',
+            array(
+                'methods' => 'POST',
+                'callback' => [Rest::class, 'save_api_key'],
+                'permission_callback' => function () {
+                    return current_user_can('manage_options');
+                },
+            )
+        );
+
+        register_rest_route(
+            'storychief/migrate',
+            'get_api_key',
+            array(
+                'methods' => 'POST',
+                'callback' => [Rest::class, 'get_api_key'],
+                'permission_callback' => function () {
+                    return current_user_can('manage_options');
+                },
+            )
+        );
+
         register_rest_route(
             'storychief/migrate',
             'destinations',
@@ -85,6 +112,18 @@ class Admin
             array(
                 'methods' => 'POST',
                 'callback' => [Rest::class, 'errors'],
+                'permission_callback' => function () {
+                    return current_user_can('manage_options');
+                },
+            )
+        );
+
+        register_rest_route(
+            'storychief/migrate',
+            'retry',
+            array(
+                'methods' => 'POST',
+                'callback' => [Rest::class, 'retry'],
                 'permission_callback' => function () {
                     return current_user_can('manage_options');
                 },
@@ -184,7 +223,6 @@ class Admin
                 $post_types[$post_type->name]['taxonomy_objects']
             );
         }
-
 
         wp_enqueue_style(
             'storychief-migrate-css',
@@ -322,6 +360,23 @@ class Admin
         return new WP_Query($post_query);
     }
 
+    public static function has_error(int $post_id): bool
+    {
+        $post_query = [
+            'post__in' => [$post_id],
+            'post_status' => 'any',
+            'posts_per_page' => 0,
+            'meta_query' => [
+                [
+                    'key' => 'storychief_migrate_error',
+                    'compare' => 'EXISTS',
+                ]
+            ],
+        ];
+
+        return (new WP_Query($post_query))->found_posts > 0;
+    }
+
     /**
      * Validate if the API-key works
      *
@@ -390,5 +445,197 @@ class Admin
             isset($json['data']['id'], $json['data']['status'], $json['data']['type']) &&
             $json['data']['status'] === 'configured' &&
             $json['data']['type'] === 'wordpress';
+    }
+
+
+    public static function get_authors(string $api_key): array
+    {
+        $authors = [];
+        $response = wp_remote_get(
+            Admin::get_rest_url().'/authors?count=100',
+            [
+                'timeout' => 10,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer '.$api_key,
+                ],
+                'sslverify' => false,
+            ]
+        );
+
+        $json = json_decode($response['body'], true);
+
+        foreach ($json['data'] as $author) {
+            $authors[$author['email']] = $author['id'];
+        }
+
+        return $authors;
+    }
+
+    public static function get_terms(string $api_key, string $type): array
+    {
+        $data = [];
+        $api_url = Admin::get_rest_url().'/'.$type.'?count=100&page=1';
+
+        while ($api_url) {
+            $response = wp_remote_get(
+                $api_url,
+                [
+                    'timeout' => 10,
+                    'headers' => [
+                        'Accept' => 'application/json',
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer '.$api_key,
+                    ],
+                    'sslverify' => false,
+                ]
+            );
+
+            $json = json_decode($response['body'], true);
+
+            foreach ($json['data'] as $row) {
+                $data[$row['slug']] = $row['id'];
+            }
+
+            if (isset($json['meta']['pagination']['links']['next'])) {
+                // Do this when StoryChief contains more than 100 categories / tags
+                $api_url = $json['meta']['pagination']['links']['next'];
+            } else {
+                break;
+            }
+        }
+
+        return $data;
+    }
+
+    public static function create_author(string $api_key, WP_User $user)
+    {
+        $author = [
+            'email' => $user->user_email,
+            'profile_picture' => get_avatar_url(
+                $user->ID,
+                [
+                    'size' => 200,
+                ]
+            ),
+        ];
+
+        $firstname = get_user_meta($user->ID, 'first_name', true);
+        $lastname = get_user_meta($user->ID, 'last_name', true);
+        $bio = get_user_meta($user->ID, 'description', true);
+
+        $author['firstname'] = !empty($firstname) ? $firstname : '-';
+
+        if (!empty($lastname)) {
+            $author['lastname'] = $lastname;
+        }
+
+        if (!empty($bio)) {
+            $author['bio'] = $bio;
+        }
+
+        // The hook allows to add a Twitter, Facebook link
+        $body = apply_filters('storychief_migrate_alter_create_author', $author, $user);
+
+        $response = wp_remote_post(
+            Admin::get_rest_url().'/authors',
+            [
+                'timeout' => 10,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer '.$api_key,
+                ],
+                'sslverify' => false,
+                'body' => json_encode($body),
+            ]
+        );
+
+        $json = json_decode($response['body'], true);
+
+        return $json['data']['id'];
+    }
+
+    /**
+     * @param  string  $api_key
+     * @param  WP_Term  $term
+     * @param  string  $type  'categories' or 'tags'
+     * @return int
+     */
+    public static function create_term(string $api_key, WP_Term $term, string $type): int
+    {
+        $response = wp_remote_post(
+            Admin::get_rest_url().'/'.$type,
+            [
+                'timeout' => 10,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer '.$api_key,
+                ],
+                'sslverify' => false,
+                'body' => json_encode(
+                    [
+                        'name' => $term->name,
+                        'slug' => $term->slug,
+                    ]
+                ),
+            ]
+        );
+
+        $json = json_decode($response['body'], true);
+
+        return $json['data']['id'];
+    }
+
+
+    public static function encrypt(string $data): string
+    {
+        $encryption_key = openssl_digest(php_uname(), 'MD5', TRUE);
+        $key = hex2bin($encryption_key);
+        $ivLength = openssl_cipher_iv_length('AES-256-CTR');
+        $randomBytes = openssl_random_pseudo_bytes($ivLength);
+
+        $ciphertext = openssl_encrypt(
+            $data,
+            'AES-256-CTR',
+            $key,
+            OPENSSL_RAW_DATA,
+            $randomBytes
+        );
+
+        return base64_encode($randomBytes.$ciphertext);
+    }
+
+    public static function decrypt(string $data): string
+    {
+        $decryption_key = openssl_digest(php_uname(), 'MD5', TRUE);
+        $key = hex2bin($decryption_key);
+        $data = base64_decode($data);
+        $ivLength = openssl_cipher_iv_length('AES-256-CTR');
+        $randomBytes = mb_substr($data, 0, $ivLength, '8bit');
+        $cipherText = mb_substr($data, $ivLength, null, '8bit');
+
+        return openssl_decrypt(
+            $cipherText,
+            'AES-256-CTR',
+            $key,
+            OPENSSL_RAW_DATA,
+            $randomBytes
+        );
+    }
+
+    public static function generate_key(): string
+    {
+        $characters = '0123456789%^%$abcdefghijklmnopqrstuvwxyz%^$ABCDEFGHIJKLMNOPQRSTUVWXYZ!}%^$M8xRG<m[&*.Q.:n[6/p:Z*4UGDn7%_HEG-/Jd';
+        $random_string = '';
+
+        for ($i = 0; $i < 30; $i++) {
+            $index = rand(0, strlen($characters) - 1);
+            $random_string .= $characters[$index];
+        }
+
+        return $random_string;
     }
 }

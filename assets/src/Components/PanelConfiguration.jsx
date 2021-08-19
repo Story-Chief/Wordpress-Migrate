@@ -276,7 +276,7 @@ function PanelConfiguration({open, disabled}) {
                             {postType && postType.taxonomy_objects.length ? <>
                                 <tr>
                                     <th>
-                                        <label>Optional filtering</label>
+                                        <label>Filter by taxonomy</label>
                                     </th>
                                     <td>
                                         <p>

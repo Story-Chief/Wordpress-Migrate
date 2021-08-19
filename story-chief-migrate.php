@@ -24,6 +24,7 @@ if (!defined('STORYCHIEF_MIGRATE_DIR')) {
 
 require __DIR__.'/includes/class.rest.php';
 require __DIR__.'/includes/class.admin.php';
+require __DIR__.'/includes/class.transfer.php';
 
 if (is_admin()) {
     add_action('admin_init', [\StorychiefMigrate\Admin::class, 'admin_init']);

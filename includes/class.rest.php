@@ -6,24 +6,40 @@ use WP_Error;
 use WP_Query;
 use WP_REST_Controller;
 use WP_REST_Request;
-use WP_Term;
-use WP_User;
-use WP_User_Query;
-
-use function Storychief\Settings\update_sc_option;
-use function Storychief\Webhook\storychief_debug_mode;
 
 class Rest extends WP_REST_Controller
 {
     public static function connection_check(WP_REST_Request $request): array
     {
-        storychief_debug_mode();
-
         $params = $request->get_json_params();
 
         return [
             'data' => [
                 'success' => Admin::connection_check($params['api_key'] ?? null),
+            ],
+        ];
+    }
+
+    public static function save_api_key(WP_REST_Request $request): array
+    {
+        $params = $request->get_json_params();
+
+        update_option('storychief_migrate_api_key', Admin::encrypt($params['api_key']), false);
+
+        return [
+            'data' => [
+                'success' => true,
+            ],
+        ];
+    }
+
+    public static function get_api_key(WP_REST_Request $request): array
+    {
+        $api_key = get_option('storychief_migrate_api_key');
+
+        return [
+            'data' => [
+                'api_key' => $api_key ? Admin::decrypt($api_key) : null,
             ],
         ];
     }
@@ -95,7 +111,7 @@ class Rest extends WP_REST_Controller
     {
         return new WP_Error(
             'invalid_channel',
-            "Sorry, that channel does not exist.",
+            "Sorry, that destination does not exist.",
             ['status' => 403]
         );
     }
@@ -169,255 +185,46 @@ class Rest extends WP_REST_Controller
             return self::errorDestination();
         }
 
-        $paramPostType = $params['post_type'];
-        $paramCategory = isset($params['category']) && taxonomy_exists(
-            $params['category']
-        ) ? $params['category'] : null;
-        $paramTag = isset($params['tag']) && taxonomy_exists($params['tag']) ? $params['tag'] : null;
+        set_time_limit(120); // Set a limit, in-case the server has no time limit
 
-        // Mapping of keys between WordPress and StoryChief
-        $authors = self::get_authors($api_key);
-        $categories = $paramCategory ? self::get_terms($api_key, 'categories') : [];
-        $tags = $paramTag ? self::get_terms($api_key, 'tags') : [];
+        $post_type = $params['post_type'];
 
-        $the_user_query = new WP_User_Query(
-            [
-                'role' => ['administrator'],
-            ]
-        );
-        $administrators = $the_user_query->get_results();
-
-        if (!is_array($authors)) {
-            $authors = [];
-        }
-
-        $post_query = Admin::prepare_query($paramPostType, $params);
-        $post_query['posts_per_page'] = 10;
+        $post_query = Admin::prepare_query($post_type, $params);
+        $post_query['posts_per_page'] = 5;
         $post_query['meta_query'] = [
             [
                 'key' => 'storychief_migrate_complete',
                 'compare' => 'NOT EXISTS',
             ]
         ];
-
         $the_query = new WP_Query(apply_filters('storychief_migrate_wp_query', $post_query, 'run'));
 
-        while ($the_query->have_posts()) {
-            $the_query->the_post();
+        $transfer = new Transfer(
+            $api_key,
+            $destination_id,
+            $params['category'] ?? null,
+            $params['tag'] ?? null
+        );
+        $transfer->execute($the_query);
 
-            $post = get_post(get_the_ID());
-
-            $post_user = get_userdata($post->post_author);
-            $post_categories = [];
-            $post_tags = [];
-            $post_published_at = date("Y-m-d\\TH:i:s+00:00", strtotime($post->post_date_gmt)); // W3C timestamp
-            $post_author_id = null;
-            $post_content = get_the_content(null, false, $post->ID);
-            $post_content = apply_filters('the_content', str_replace(']]>', ']]&gt;', $post_content));
-            $post_content = preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', $post_content);
-
-            if (!$post_user) {
-                // Edge case:
-                // Some posts may not have an author, this can be because the original user got deleted
-                $post_user = $administrators[0];
-            }
-
-            if (isset($authors[$post_user->user_email])) {
-                $post_author_id = $authors[$post_user->user_email];
-            } else {
-                // If the author doesn't exist, create that one in StoryChief
-                $post_author_id = $authors[$post_user->user_email] = self::create_author($api_key, $post_user);
-            }
-
-            if ($paramCategory) {
-                foreach (wp_get_post_categories($post->ID) as $category_id) {
-                    /** @var WP_Term $category */
-                    $category = get_category($category_id);
-
-                    if (isset($categories[$category->slug])) {
-                        $post_categories[] = $categories[$category->slug];
-                    } else {
-                        // Create category through the API
-                        $sc_category_id = self::create_term($api_key, $category, 'categories');
-
-                        $categories[$category->slug] = $sc_category_id;
-                        $post_categories[] = $sc_category_id;
-                    }
-                }
-            }
-
-            if ($paramTag) {
-                foreach (wp_get_post_tags($post->ID) as $tag_id) {
-                    /** @var WP_Term $tag */
-                    $tag = get_category($tag_id);
-
-                    if (isset($tags[$tag->slug])) {
-                        $post_tags[] = $tags[$tag->slug];
-                    } else {
-                        // Create tag through the API
-                        $sc_tag_id = self::create_term($api_key, $tag, 'tags');
-
-                        $tags[$tag->slug] = $sc_tag_id;
-                        $post_tags[] = $sc_tag_id;
-                    }
-                }
-            }
-
-            // Apply hook:
-            // Developers can use this hook, to add extra parameters such as language, source_id, ...
-            // Read more: https://developers.storychief.io/
-
-            $excerpt = !empty($post->post_excerpt) ? $post->post_excerpt : null;
-
-
-            $post_body = [
-                'title' => get_the_title(),
-                'content' => $post_content,
-                'slug' => $post->post_name,
-                'custom_fields' => [],
-                'seo_title' => get_the_title(),
-                'seo_description' => $excerpt,
-                'categories' => $post_categories,
-                'tags' => $post_tags,
-                'author_id' => $post_author_id,
-            ];
-
-            if (has_post_thumbnail()) {
-                $image = wp_get_attachment_image_src(get_post_thumbnail_id($post->ID), 'large');
-
-                if ($image && isset($image[0])) {
-                    $image_url = str_replace(basename($image[0]), '', $image[0]).rawurlencode(basename($image[0]));
-                    // Replace white space with %20, or else URL validation fails
-                    $post_body['featured_image'] = $image_url;
-                    $post_body['featured_image_alt'] = get_post_meta(
-                        get_post_thumbnail_id(),
-                        '_wp_attachment_image_alt',
-                        true
-                    );
-                }
-            }
-
-            $body = apply_filters(
-                'storychief_migrate_alter_body',
-                $post_body,
-                $post
-            );
-
-            $response = wp_remote_post(
-                Admin::get_rest_url().'/stories',
-                [
-                    'timeout' => 30,
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                        'Accept' => 'application/json',
-                        'Authorization' => 'Bearer '.$api_key,
-                    ],
-                    'sslverify' => false,
-                    'body' => json_encode($body),
-                ]
-            );
-            // Mark this post as complete
-            update_post_meta($post->ID, 'storychief_migrate_complete', 1);
-
-            // Keep the mapping, for possible retry
-            update_post_meta($post->ID, 'storychief_migrate_category', $paramCategory);
-            update_post_meta($post->ID, 'storychief_migrate_tag', $paramTag);
-
-            if ($response instanceof WP_Error) {
-                /** @var WP_Error $response */
-                update_post_meta(
-                    $post->ID,
-                    'storychief_migrate_error',
-                    [
-                        'code' => 500,
-                        'message' => $response->get_error_message(),
-                        'type' => 'curl',
-                        'errors' => $response->errors,
-                    ]
-                );
-
-                continue;
-            }
-
-            $data = json_decode($response['body'], true);
-            $code = (int)floor(round($response['response']['code']) / 100) * 100;
-
-            if ($response['response']['code'] >= 400) {
-                if ($code === 400) {
-                    update_post_meta(
-                        $post->ID,
-                        'storychief_migrate_error',
-                        [
-                            'code' => $response['response']['code'],
-                            'message' => $data['message'] ?? $response['response']['message'],
-                            'type' => 'invalid_request',
-                            'errors' => $data['errors'] ?? [],
-                        ]
-                    );
-                    continue;
-                }
-
-                if ($code === 500) {
-                    update_post_meta(
-                        $post->ID,
-                        'storychief_migrate_error',
-                        [
-                            'code' => $response['response']['code'],
-                            'message' => $response['response']['message'],
-                            'type' => 'internal_server_error',
-                            'errors' => [],
-                        ]
-                    );
-                    continue;
-                }
-            } else {
-                // Remove error, if a second attempt was successful
-                delete_post_meta($post->ID, 'storychief_migrate_error');
-            }
-
-            // Set the story in SC as published
-            wp_remote_post(
-                Admin::get_rest_url().'/stories/'.$data['data']['id'].'/destinations',
-                [
-                    'method' => 'PUT',
-                    'timeout' => 10,
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                        'Accept' => 'application/json',
-                        'Authorization' => 'Bearer '.$api_key,
-                    ],
-                    'sslverify' => false,
-                    'body' => json_encode(
-                        [
-                            'published_at' => $post_published_at,
-                            'external_id' => $post->ID,
-                            'destination_id' => $destination_id,
-                            'external_url' => get_post_permalink($post->ID),
-                        ]
-                    ),
-                ]
-            );
-        }
-        wp_reset_postdata();
-
-
-        $total_posts = Admin::get_total_posts($paramPostType, $params);
-        $total_completed = Admin::get_total_completed($paramPostType, $params);
-        $total_percentage = Admin::get_total_percentage($paramPostType, $params);
+        $total_posts = Admin::get_total_posts($post_type, $params);
+        $total_completed = Admin::get_total_completed($post_type, $params);
+        $total_percentage = Admin::get_total_percentage($post_type, $params);
 
         // Mark inside the migration as complete (when 100%), and ignore newer posts
-        update_sc_option('migrate_completed', $total_completed >= $total_posts);
+        update_option('storychief_migrate_completed', $total_completed >= $total_posts);
 
         return [
             'data' => [
                 'total_posts' => $total_posts,
                 'total_completed' => $total_completed,
                 'total_percentage' => $total_percentage,
-                'total_failed' => Admin::total_errors($paramPostType, $params),
+                'total_failed' => Admin::total_errors($post_type, $params),
                 'completed' => $total_completed >= $total_posts,
             ],
         ];
     }
+
 
     public static function errors(WP_REST_Request $request): array
     {
@@ -444,144 +251,59 @@ class Rest extends WP_REST_Controller
         ];
     }
 
-    protected static function get_authors(string $api_key): array
+    public static function retry(WP_REST_Request $request)
     {
-        $authors = [];
-        $response = wp_remote_get(
-            Admin::get_rest_url().'/authors?count=100',
+        $params = $request->get_json_params();
+        $post_id = $params['post_id'] ?? null;
+        $api_key = Admin::decrypt(get_option('storychief_migrate_api_key'));
+
+        if (!Admin::connection_check($api_key)) {
+            return self::errorConnection();
+        }
+
+        $destination_id = +get_post_meta($post_id, 'storychief_migrate_destination_id', true);
+        $category = get_post_meta($post_id, 'storychief_migrate_category', true);
+        $tag = get_post_meta($post_id, 'storychief_migrate_tag', true);
+
+        if (!Admin::destination_exists($api_key, $destination_id)) {
+            return self::errorDestination();
+        }
+
+        set_time_limit(120);
+
+        $the_query = new WP_Query(
             [
-                'timeout' => 10,
-                'headers' => [
-                    'Accept' => 'application/json',
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer '.$api_key,
-                ],
-                'sslverify' => false,
+                'post_status' => 'any',
+                'post__in' => [$post_id],
             ]
         );
 
-        $json = json_decode($response['body'], true);
+        $transfer = new Transfer(
+            $api_key,
+            $destination_id,
+            $category,
+            $tag
+        );
+        $transfer->execute($the_query);
 
-        foreach ($json['data'] as $author) {
-            $authors[$author['email']] = $author['id'];
+        $error = null;
+
+        if (Admin::has_error($post_id)) {
+            $error = [
+                'ID' => get_the_ID(),
+                'title' => get_the_title(),
+                'permalink' => get_the_permalink(),
+                'category' => get_post_meta(get_the_ID(), 'storychief_migrate_category', true),
+                'tag' => get_post_meta(get_the_ID(), 'storychief_migrate_tag', true),
+                'error' => get_post_meta(get_the_ID(), 'storychief_migrate_error', true),
+            ];
         }
 
-        return $authors;
-    }
-
-    protected static function get_terms(string $api_key, string $type): array
-    {
-        $data = [];
-        $api_url = Admin::get_rest_url().'/'.$type.'?count=100&page=1';
-
-        while ($api_url) {
-            $response = wp_remote_get(
-                $api_url,
-                [
-                    'timeout' => 10,
-                    'headers' => [
-                        'Accept' => 'application/json',
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer '.$api_key,
-                    ],
-                    'sslverify' => false,
-                ]
-            );
-
-            $json = json_decode($response['body'], true);
-
-            foreach ($json['data'] as $row) {
-                $data[$row['slug']] = $row['id'];
-            }
-
-            if (isset($json['meta']['pagination']['links']['next'])) {
-                // Do this when StoryChief contains more than 100 categories / tags
-                $api_url = $json['meta']['pagination']['links']['next'];
-            } else {
-                break;
-            }
-        }
-
-        return $data;
-    }
-
-    protected static function create_author(string $api_key, WP_User $user)
-    {
-        $author = [
-            'email' => $user->user_email,
-            'profile_picture' => get_avatar_url(
-                $user->ID,
-                [
-                    'size' => 200,
-                ]
-            ),
+        return [
+            'data' => [
+                'success' => !$error,
+                'error' => $error,
+            ]
         ];
-
-        $firstname = get_user_meta($user->ID, 'first_name', true);
-        $lastname = get_user_meta($user->ID, 'last_name', true);
-        $bio = get_user_meta($user->ID, 'description', true);
-
-        $author['firstname'] = !empty($firstname) ? $firstname : '-';
-
-        if (!empty($lastname)) {
-            $author['lastname'] = $lastname;
-        }
-
-        if (!empty($bio)) {
-            $author['bio'] = $bio;
-        }
-
-        // The hook allows to add a Twitter, Facebook link
-        $body = apply_filters('storychief_migrate_alter_create_author', $author, $user);
-
-        $response = wp_remote_post(
-            Admin::get_rest_url().'/authors',
-            [
-                'timeout' => 10,
-                'headers' => [
-                    'Accept' => 'application/json',
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer '.$api_key,
-                ],
-                'sslverify' => false,
-                'body' => json_encode($body),
-            ]
-        );
-
-        $json = json_decode($response['body'], true);
-
-        return $json['data']['id'];
-    }
-
-    /**
-     * @param  string  $api_key
-     * @param  WP_Term  $term
-     * @param  string  $type  'categories' or 'tags'
-     * @return int
-     */
-    protected static function create_term(string $api_key, WP_Term $term, string $type): int
-    {
-        $response = wp_remote_post(
-            Admin::get_rest_url().'/'.$type,
-            [
-                'timeout' => 10,
-                'headers' => [
-                    'Accept' => 'application/json',
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer '.$api_key,
-                ],
-                'sslverify' => false,
-                'body' => json_encode(
-                    [
-                        'name' => $term->name,
-                        'slug' => $term->slug,
-                    ]
-                ),
-            ]
-        );
-
-        $json = json_decode($response['body'], true);
-
-        return $json['data']['id'];
     }
 }
