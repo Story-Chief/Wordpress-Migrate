@@ -77,7 +77,7 @@ function run({completed, setCompleted, setRunning, apiKey, filters, dispatchData
             }
 
             // Delay the next request, to throttle the amount of requests per minute
-            await new Promise((resolve) => setTimeout(resolve, 10000));
+            await new Promise((resolve) => setTimeout(resolve, 3000));
         }
 
         window.onbeforeunload = null;

@@ -20,6 +20,14 @@ class Transfer
 
     public function __construct(string $api_key, string $destination_id, $category, $tag)
     {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            // Show errors, to avoid the default error message
+            error_reporting(E_ALL);
+            ini_set('display_errors', 1);
+            ini_set('error_reporting', 1);
+            ini_set('html_errors', 1);
+        }
+
         $this->api_key = $api_key;
         $this->destination_id = $destination_id;
         $this->category = $category;
@@ -27,7 +35,7 @@ class Transfer
     }
 
     public function execute(WP_Query $the_query)
-    {
+    {;
         // Mapping of keys between WordPress and StoryChief
         $authors = Admin::get_authors($this->api_key);
         $categories = $this->category ? Admin::get_terms($this->api_key, 'categories') : [];
@@ -66,11 +74,8 @@ class Transfer
                 $post_author_id = $authors[$post_user->user_email] = Admin::create_author($this->api_key, $post_user);
             }
 
-            if ($this->category) {
-                foreach (wp_get_post_categories($post->ID) as $category_id) {
-                    /** @var WP_Term $category */
-                    $category = get_category($category_id);
-
+            if ($this->category && ($terms = get_the_terms($post->ID, $this->category))) {
+                foreach ($terms as $category) {
                     if (isset($categories[$category->slug])) {
                         $post_categories[] = $categories[$category->slug];
                     } else {
@@ -83,11 +88,8 @@ class Transfer
                 }
             }
 
-            if ($this->tag) {
-                foreach (wp_get_post_tags($post->ID) as $tag_id) {
-                    /** @var WP_Term $tag */
-                    $tag = get_category($tag_id);
-
+            if ($this->tag && ($terms = get_the_terms($post->ID, $this->tag))) {
+                foreach ($terms as $tag) {
                     if (isset($tags[$tag->slug])) {
                         $post_tags[] = $tags[$tag->slug];
                     } else {

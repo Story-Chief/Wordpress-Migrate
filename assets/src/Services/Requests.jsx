@@ -24,7 +24,7 @@ export async function connectionCheck(apiKey) {
 
     const json = await response.json();
 
-    return json.data.success;
+    return json.data ? json.data.success : false;
 }
 
 export async function saveApiKey(apiKey) {
@@ -86,6 +86,7 @@ export function prepareFiltersToSearch(filters) {
         post_status: filters.postStatus,
         category: filters.category?.name,
         tag: filters.tag?.name,
+        filter_taxonomy: filters.filterTaxonomy ? filters.filterTaxonomy.name : null,
         filter_terms: filters.filterTaxonomy ? filters.filterTaxonomy.items.filter(tax => tax.checked).map(tax => tax.value) : []
     };
 }

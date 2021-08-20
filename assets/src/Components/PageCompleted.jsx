@@ -90,6 +90,10 @@ function PageCompleted() {
                             <ul className="scm-list">
                                 <li>
                                     Some posts may have failed due the fact, they had broken images or HTML
+                                    <ul>
+                                        <li>Badly closed tags</li>
+                                        <li>Images that don't exist or have no file extension</li>
+                                    </ul>
                                 </li>
                                 <li>
                                     Below is a list of posts that failed, with a description

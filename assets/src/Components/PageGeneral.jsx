@@ -13,7 +13,7 @@ function PageGeneral() {
                 <p>We recommend running the migration first, through a staging environment if possible</p>
 
                 <section>
-                    <PanelApiKey open={activePanel === 'api_key'}/>
+                    <PanelApiKey open={activePanel === 'api_key'} disabled={filters.apiKeyReady}/>
                     <PanelConfiguration open={activePanel === 'configuration'} disabled={!filters.apiKeyReady || running}/>
                     <PanelRun open={activePanel === 'run'} disabled={!filters.configurationReady || running}/>
                 </section>

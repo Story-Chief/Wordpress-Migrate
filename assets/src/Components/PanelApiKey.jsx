@@ -9,10 +9,10 @@ const propTypes = {
     open: PropTypes.bool.isRequired,
 }
 
-function PanelApiKey({open}) {
+function PanelApiKey({open, disabled}) {
     const {apiKey, setApiKey, dispatchFilters, setActivePanel} = useContext(StoryChiefContext);
     const [showError, setShowError] = useState(null);
-    const [disabled, setDisabled] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         getApiKey().then(response => {
@@ -25,20 +25,21 @@ function PanelApiKey({open}) {
         event.preventDefault();
 
         setShowError(false);
+        setLoading(true);
 
         const success = await connectionCheck(apiKey);
 
+        setShowError(!success);
+        setLoading(false);
+
         if (success) {
+            setActivePanel('configuration');
             dispatchFilters({
                 type: 'update',
                 value: {},
             });
-            setDisabled(true);
-            setActivePanel('configuration');
 
             saveApiKey(apiKey).then(() => null);
-        } else {
-            setShowError(true);
         }
     }
 
@@ -69,6 +70,7 @@ function PanelApiKey({open}) {
                                         autoComplete="off"
                                         value={apiKey || ''}
                                         style={{width: '500px'}}
+                                        disabled={loading}
                                         onChange={({target}) => setApiKey(target.value)}/>
                                 <p className="scm-help-text">
                                     <em>Your key will be stored and encrypted.</em>
@@ -81,8 +83,12 @@ function PanelApiKey({open}) {
                     {showError && <FormError message="Sorry, the API-key you entered is incorrect."/>}
 
                     <p className="submit">
-                        <button type="submit" name="submit" id="submit" className="button button-primary"
-                                disabled={!apiKey}>
+                        <button
+                                type="submit"
+                                name="submit"
+                                id="submit"
+                                className="button button-primary"
+                                disabled={!apiKey || loading}>
                             Next
                         </button>
                     </p>

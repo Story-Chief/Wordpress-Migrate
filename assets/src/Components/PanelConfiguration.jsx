@@ -183,13 +183,13 @@ function PanelConfiguration({open, disabled}) {
                                     <select
                                             name="category"
                                             id="category"
-                                            required
                                             value={category?.name || ''}
                                             onChange={handleCategory}
                                     >
                                         <option value="">Please select a category</option>
-                                        {postType.taxonomies.map(tax => <option key={tax.name}
-                                                                                value={tax.name}>{tax.label}</option>)}
+                                        {postType.taxonomies.map(tax => (
+                                                <option key={tax.name} value={tax.name}>{tax.label}</option>
+                                        ))}
                                     </select>
                                 </td>
                             </tr>
@@ -201,13 +201,13 @@ function PanelConfiguration({open, disabled}) {
                                     <select
                                             name="tag"
                                             id="tag"
-                                            required
                                             value={tag?.name || ''}
                                             onChange={handleTag}
                                     >
                                         <option value="">Please select a tag</option>
-                                        {postType.taxonomies.map(tax => <option key={tax.name}
-                                                                                value={tax.name}>{tax.label}</option>)}
+                                        {postType.taxonomies.map(tax => (
+                                                <option key={tax.name} value={tax.name}>{tax.label}</option>
+                                        ))}
                                     </select>
                                 </td>
                             </tr>

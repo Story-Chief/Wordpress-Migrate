@@ -5,6 +5,7 @@ namespace StoryChiefMigrate;
 use WP_Error;
 use WP_Query;
 use WP_Term;
+use WP_Term_Query;
 use WP_User;
 
 class Admin
@@ -197,13 +198,17 @@ class Admin
                                 'post_status' => [
                                     'publish',
                                     'draft',
-                                    'pending',
                                     'future',
                                     'private'
                                 ],
-                                'post_type' => $post_type->name,
-                                'category__in' => [$term->term_id],
-                                'posts_per_page' => 1,
+                                'posts_per_page' => 0,
+                                'tax_query' => [
+                                    [
+                                        'taxonomy' => $taxonomy->name,
+                                        'field' => 'id',
+                                        'terms' => $term->term_id,
+                                    ]
+                                ]
                             ]
                         );
 
@@ -297,8 +302,20 @@ class Admin
             'fields' => 'ids'
         ];
 
-        if (isset($filters['filter_terms']) && is_array($filters['filter_terms']) && count($filters['filter_terms'])) {
-            $post_query['category__in'] = $filters['filter_terms'];
+        if (
+            isset($filters['filter_taxonomy'], $filters['filter_terms']) &&
+            count($filters['filter_terms']) &&
+            taxonomy_exists($filters['filter_taxonomy'])
+        ) {
+            $post_query['tax_query'] = ['relation' => 'OR'];
+
+            foreach ($filters['filter_terms'] as $taxId) {
+                $post_query['tax_query'][] = [
+                    'taxonomy' => $filters['filter_taxonomy'],
+                    'field' => 'id',
+                    'terms' => $taxId,
+                ];
+            }
         }
 
         return $post_query;
@@ -589,10 +606,17 @@ class Admin
         );
 
         $json = json_decode($response['body'], true);
-
         return $json['data']['id'];
     }
 
+    public static function get_taxonomies(int $post_id, string $taxonomy_name): WP_Term_Query
+    {
+        return new WP_Term_Query(
+            [
+                'taxonomy' => $taxonomy_name,
+            ]
+        );
+    }
 
     public static function encrypt(string $data, string $encryption_key): string
     {
