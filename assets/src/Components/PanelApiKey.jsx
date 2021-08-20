@@ -16,7 +16,6 @@ function PanelApiKey({open, disabled}) {
 
     useEffect(() => {
         getApiKey().then(response => {
-            console.log(response);
             setApiKey(response?.data?.api_key);
         });
     }, []);

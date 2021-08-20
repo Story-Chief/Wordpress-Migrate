@@ -20,7 +20,6 @@ const propTypes = {
 
 let migratingIsRunning = false;
 
-
 function run({completed, setCompleted, setRunning, apiKey, filters, dispatchData, setError}) {
     // Place this function outside the component scope, and use vanilla JS to only have one instance
     (async () => {
@@ -48,6 +47,7 @@ function run({completed, setCompleted, setRunning, apiKey, filters, dispatchData
                 }),
             });
 
+            const status = response.status;
             const json = await response.json();
 
             dispatchData({type: 'update', value: json.data});
@@ -59,10 +59,10 @@ function run({completed, setCompleted, setRunning, apiKey, filters, dispatchData
                 return false;
             }
 
-            if (json.data.status >= 400) {
+            if (status >= 400) {
                 // Show the error message
 
-                if ([403, 500].includes(json.data.status === 403)) {
+                if ([403, 500].includes(status)) {
                     setRunning(migratingIsRunning = false);
                     dispatchData({type: 'reset'});
                     setError(json.message);
@@ -117,6 +117,7 @@ function PanelApiKey({open, disabled}) {
     function handleStart(event) {
         event.preventDefault();
 
+        setError(null);
         setRunning(migratingIsRunning = true);
 
         run({completed, setCompleted, setRunning, apiKey, filters, dispatchData, setError});
