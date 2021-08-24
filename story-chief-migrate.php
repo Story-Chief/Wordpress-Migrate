@@ -5,6 +5,7 @@
  * Plugin URI: https://storychief.io/wordpress
  * Description: This plugin helps you to migrate existing posts to StoryChief.
  * Version: 0.2
+ * Requires PHP: 7.2
  * Author: StoryChief
  * Author URI: http://storychief.io
  * License: GPL3
