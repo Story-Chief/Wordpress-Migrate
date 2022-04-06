@@ -9,11 +9,9 @@ Stable tag: 0.1
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
-Migrate all your existing WordPress posts, to your all-in-one Content Marketing Workspace.
-
 == Description ==
 
-Migrate all your existing WordPress posts, to your all-in-one Content Marketing Workspace.
+Migrate all your existing WordPress posts, to your StoryChief workspace.
 
 This plugin:
 
