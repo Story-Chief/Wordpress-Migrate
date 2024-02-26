@@ -9,15 +9,6 @@ use function Storychief\Settings\get_sc_option;
 
 class Admin
 {
-
-    public static function admin_init()
-    {
-        add_filter(
-            'plugin_action_links_story-chief-migrate/story-chief-migrate.php',
-            array(self::class, 'settings_link')
-        );
-    }
-
     public static function admin_menu()
     {
         add_options_page(

@@ -26,7 +26,7 @@ require __DIR__.'/includes/class.rest.php';
 require __DIR__.'/includes/class.admin.php';
 
 if (is_admin()) {
-    add_action('admin_init', [\StorychiefMigrate\Admin::class, 'admin_init']);
+    add_filter('plugin_action_links_' . plugin_basename(__FILE__), [\StorychiefMigrate\Admin::class, 'settings_link']);
     add_action('admin_menu', [\StorychiefMigrate\Admin::class, 'admin_menu']);
 }
 add_action('rest_api_init', [\StorychiefMigrate\Admin::class, 'admin_json']);
