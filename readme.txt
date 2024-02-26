@@ -2,10 +2,10 @@
 Contributors: StoryChief
 Donate link: https://storychief.io
 Tags: Content marketing calendar, social media scheduling, content marketing, schedule facebook posts, schedule to twitter, schedule posts to Linkedin, social media analytics
-Requires at least: 4.6
-Tested up to: 5.6
-Requires PHP: 5.4
-Stable tag: 0.1
+Requires at least: 5.0
+Tested up to: 7.4
+Requires PHP: 7.4
+Stable tag: 0.2
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
