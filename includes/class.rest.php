@@ -151,6 +151,10 @@ class Rest extends WP_REST_Controller
 
             $post = get_post(get_the_ID());
 
+            if (get_post_meta($post->ID, 'storychief_migrate_complete', true) == true) {
+                continue;
+            }
+
             $post_user = get_userdata($post->post_author);
             $post_categories = [];
             $post_tags = [];
